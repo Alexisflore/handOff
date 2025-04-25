@@ -74,7 +74,7 @@ export function EnhancedCommentThread({
   }
 
   return (
-    <>
+    <div className="flex flex-col h-full">
       <CardHeader className="border-b py-3 px-4 flex-shrink-0 bg-slate-50">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">Discussion</CardTitle>
@@ -102,48 +102,50 @@ export function EnhancedCommentThread({
       </CardHeader>
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Scrollable message area */}
-        <CardContent className="p-0 flex-1 overflow-auto">
-          {sortedComments.length === 0 ? (
-            <div className="flex h-full items-center justify-center p-4">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">No comments yet for this project.</p>
-                <p className="text-xs text-muted-foreground mt-1">Start the conversation with your designer.</p>
+        {/* Scrollable message area with fixed height */}
+        <div className="h-[400px] overflow-auto">
+          <CardContent className="p-0">
+            {sortedComments.length === 0 ? (
+              <div className="flex h-full items-center justify-center p-4">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">No comments yet for this project.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Start the conversation with your designer.</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="p-4 space-y-3">
-              {sortedComments.map((comment) => (
-                <div key={comment.id} className={`${comment.isClient ? "items-end" : ""}`}>
-                  <div className={`${comment.isClient ? "flex flex-col items-end" : "flex flex-col"}`}>
-                    <div className={`flex items-center gap-1.5 ${comment.isClient ? "justify-end" : ""} mb-1`}>
-                      <span className="text-xs font-medium">{comment.author.name}</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs px-1.5 py-0 ${
-                          comment.milestoneId === currentMilestone ? "bg-blue-50 text-blue-700 hover:bg-blue-50" : ""
+            ) : (
+              <div className="p-4 space-y-3">
+                {sortedComments.map((comment) => (
+                  <div key={comment.id} className={`${comment.isClient ? "items-end" : ""}`}>
+                    <div className={`${comment.isClient ? "flex flex-col items-end" : "flex flex-col"}`}>
+                      <div className={`flex items-center gap-1.5 ${comment.isClient ? "justify-end" : ""} mb-1`}>
+                        <span className="text-xs font-medium">{comment.author.name}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs px-1.5 py-0 ${
+                            comment.milestoneId === currentMilestone ? "bg-blue-50 text-blue-700 hover:bg-blue-50" : ""
+                          }`}
+                        >
+                          {comment.milestoneName} • {comment.versionName}
+                        </Badge>
+                      </div>
+                      <div
+                        className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
+                          comment.isClient
+                            ? "ml-auto bg-teal-600 text-white shadow-sm"
+                            : "bg-white border border-slate-200 text-foreground shadow-sm"
                         }`}
                       >
-                        {comment.milestoneName} • {comment.versionName}
-                      </Badge>
+                        {comment.content}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{comment.timestamp.split("•")[1]}</p>
                     </div>
-                    <div
-                      className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
-                        comment.isClient
-                          ? "ml-auto bg-teal-600 text-white shadow-sm"
-                          : "bg-white border border-slate-200 text-foreground shadow-sm"
-                      }`}
-                    >
-                      {comment.content}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{comment.timestamp.split("•")[1]}</p>
                   </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </CardContent>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </CardContent>
+        </div>
 
         {/* Input area at the bottom */}
         <div className="border-t p-3 flex-shrink-0">
@@ -174,6 +176,6 @@ export function EnhancedCommentThread({
           <p className="mt-1 text-xs text-muted-foreground text-right">Press Ctrl+Enter to send</p>
         </div>
       </div>
-    </>
+    </div>
   )
 }
