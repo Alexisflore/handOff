@@ -1,18 +1,48 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
+import { createBrowserClient } from "@supabase/ssr"
 
 export default function LoginDesignerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<any>(null)
+  const [currentSession, setCurrentSession] = useState<any>(null)
   const router = useRouter()
   
   const designerId = process.env.NEXT_PUBLIC_DESIGNER_ID || "550e8400-e29b-41d4-a716-446655440001"
+
+  // Vérifier la session actuelle au chargement
+  useEffect(() => {
+    checkCurrentSession();
+  }, []);
+
+  async function checkCurrentSession() {
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (data.session) {
+        setCurrentSession({
+          userId: data.session.user.id,
+          email: data.session.user.email,
+          role: data.session.user.user_metadata?.role || 'No role set',
+          hasMetadata: !!data.session.user.user_metadata,
+          metadataKeys: Object.keys(data.session.user.user_metadata || {})
+        });
+      }
+    } catch (err) {
+      console.error("Erreur lors de la vérification de la session:", err);
+    }
+  }
 
   async function handleLogin() {
     try {
@@ -35,8 +65,10 @@ export default function LoginDesignerPage() {
       setSuccess(true)
       setSessionInfo(data)
       
-      // Rediriger vers la page du projet Brand Redesign
-      router.push("/projects/550e8400-e29b-41d4-a716-446655440020")
+      // Vérifier la session mise à jour
+      await checkCurrentSession();
+      
+      // Ne pas rediriger automatiquement pour permettre de voir les infos de debug
     } catch (err) {
       console.error("Erreur:", err)
       setError(`Une erreur s'est produite: ${err instanceof Error ? err.message : String(err)}`)
@@ -47,7 +79,7 @@ export default function LoginDesignerPage() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-      <Card className="w-[400px] shadow-md">
+      <Card className="w-[500px] shadow-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Connexion Designer</CardTitle>
           <CardDescription>
@@ -64,6 +96,22 @@ export default function LoginDesignerPage() {
             </code>
           </div>
           
+          {/* Session actuelle */}
+          <div className="bg-slate-50 p-3 rounded-md">
+            <h3 className="text-sm font-medium mb-1">Session actuelle</h3>
+            {currentSession ? (
+              <div className="text-xs space-y-1">
+                <p><b>User ID:</b> {currentSession.userId}</p>
+                <p><b>Email:</b> {currentSession.email}</p>
+                <p><b>Role:</b> {currentSession.role}</p>
+                <p><b>Has Metadata:</b> {currentSession.hasMetadata ? 'Oui' : 'Non'}</p>
+                <p><b>Metadata Keys:</b> {currentSession.metadataKeys.length ? currentSession.metadataKeys.join(', ') : 'Aucune'}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Aucune session active</p>
+            )}
+          </div>
+          
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
               {error}
@@ -74,26 +122,31 @@ export default function LoginDesignerPage() {
             <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-md text-sm">
               <p className="font-semibold">Connexion réussie !</p>
               <p className="text-xs mt-1">Session ID: {sessionInfo.sessionId}</p>
-              <p className="text-xs">Redirection en cours...</p>
+              <p className="text-xs">Role défini: {sessionInfo.role}</p>
+              <p className="text-xs mt-2">Veuillez vérifier les informations de session ci-dessus pour confirmer que le rôle est correctement défini.</p>
             </div>
           )}
           
           <Button 
             className="w-full" 
             onClick={handleLogin}
-            disabled={loading || success}
+            disabled={loading}
           >
-            {loading ? "Connexion en cours..." : "Se connecter en tant que Designer"}
+            {loading ? "Connexion en cours..." : success ? "Reconnecter" : "Se connecter en tant que Designer"}
+          </Button>
+          
+          <Button 
+            className="w-full mt-2" 
+            variant="outline"
+            onClick={() => router.push("/projects/550e8400-e29b-41d4-a716-446655440020")}
+          >
+            Accéder au projet Brand Redesign
           </Button>
           
           {success && (
-            <Button 
-              className="w-full mt-2" 
-              variant="outline"
-              onClick={() => router.push("/projects/550e8400-e29b-41d4-a716-446655440020")}
-            >
-              Accéder au projet Brand Redesign
-            </Button>
+            <div className="mt-2 text-xs text-muted-foreground">
+              <p>Si vous rencontrez des problèmes avec le rôle de designer, essayez de rafraîchir la page du projet après la connexion.</p>
+            </div>
           )}
         </CardContent>
       </Card>

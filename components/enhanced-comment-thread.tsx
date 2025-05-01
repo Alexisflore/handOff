@@ -93,7 +93,7 @@ export function EnhancedCommentThread({
               size="sm"
               onClick={() => setFilter("milestone")}
               className="h-7 text-xs px-2 font-medium transition-colors"
-              data-filter="milestone"
+              data-filter="deliverable"
             >
               This Milestone
             </Button>
@@ -102,9 +102,9 @@ export function EnhancedCommentThread({
       </CardHeader>
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Scrollable message area with fixed height */}
-        <div className="h-[400px] overflow-auto">
-          <CardContent className="p-0">
+        {/* Scrollable message area that takes available space */}
+        <div className="flex-1 overflow-y-auto">
+          <CardContent className="p-0 h-full">
             {sortedComments.length === 0 ? (
               <div className="flex h-full items-center justify-center p-4">
                 <div className="text-center">
@@ -147,8 +147,8 @@ export function EnhancedCommentThread({
           </CardContent>
         </div>
 
-        {/* Input area at the bottom */}
-        <div className="border-t p-3 flex-shrink-0">
+        {/* Input area always at the bottom */}
+        <div className="border-t p-3 mt-auto flex-shrink-0">
           <div className="flex flex-col gap-2">
             <Textarea
               placeholder="Type your comment..."

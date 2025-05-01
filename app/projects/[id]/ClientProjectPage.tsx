@@ -9,7 +9,6 @@ import { notFound } from "next/navigation"
 type ProjectData = {
   project: any
   client: any
-  steps: any[]
   deliverables: any[]
   comments: any[]
   freelancer: any
@@ -19,9 +18,9 @@ type ProjectData = {
 // Composant de chargement pour afficher pendant que les données sont récupérées
 function LoadingSkeleton() {
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="flex h-screen w-full bg-white">
       <div className="hidden md:flex w-64 flex-col border-r bg-white">
-        <div className="p-4 border-b bg-slate-50">
+        <div className="p-4 border-b">
           <Skeleton className="h-12 w-12 rounded-full" />
         </div>
         <div className="p-4 border-b">
@@ -51,28 +50,85 @@ function LoadingSkeleton() {
   )
 }
 
+// Fonction pour adapter les données au format attendu par ClientPortal
+function adaptDataForClientPortal(data: any): ProjectData {
+  if (!data) {
+    return {
+      project: {},
+      client: {},
+      deliverables: [],
+      comments: [],
+      freelancer: {},
+      sharedFiles: []
+    };
+  }
+  
+  // Si les livrables sont directement dans la structure, les adapter
+  let deliverables = data.deliverables || [];
+  
+  // Transformer chaque livrable si nécessaire
+  deliverables = deliverables.map((deliverable: any) => {
+    // Vérifier si le livrable a déjà une structure avec versions
+    if (deliverable.versions) {
+      return deliverable;
+    }
+    
+    // Sinon, adapter le livrable pour avoir le format attendu
+    return {
+      ...deliverable,
+      // Ajouter le livrable lui-même comme version (pour la compatibilité)
+      versions: [
+        {
+          id: deliverable.id,
+          version_name: deliverable.version_name || "Version 1",
+          is_latest: deliverable.is_latest || true,
+          created_at: deliverable.created_at,
+          file_type: deliverable.file_type,
+          file_name: deliverable.file_name,
+          file_url: deliverable.file_url,
+          status: deliverable.status,
+          step_id: deliverable.step_id,
+          description: deliverable.description
+        }
+      ]
+    };
+  });
+  
+  return {
+    project: data.project,
+    client: data.client,
+    deliverables: deliverables,
+    comments: data.comments || [],
+    freelancer: data.freelancer,
+    sharedFiles: data.sharedFiles || []
+  };
+}
+
 // Composant principal qui affiche les données du projet
-function ProjectPage({ projectData }: { projectData: ProjectData }) {
+function ProjectPage({ projectData }: { projectData: any }) {
   // Vérifier si les données ont été récupérées correctement
   if (!projectData || !projectData.project) {
     return notFound()
   }
+  
+  // Adapter les données au format attendu par le composant ClientPortal
+  const adaptedData = adaptDataForClientPortal(projectData);
 
   // Passer les données récupérées au composant ClientPortal
   return (
     <ClientPortal
-      project={projectData.project}
-      client={projectData.client}
-      milestones={projectData.steps}
-      freelancer={projectData.freelancer}
-      comments={projectData.comments}
-      sharedFiles={projectData.sharedFiles}
+      project={adaptedData.project}
+      client={adaptedData.client}
+      milestones={adaptedData.deliverables}
+      freelancer={adaptedData.freelancer}
+      comments={adaptedData.comments}
+      sharedFiles={adaptedData.sharedFiles}
     />
   )
 }
 
 // Exporter le composant de page avec Suspense pour gérer le chargement
-export default function ClientProjectPage({ projectData }: { projectData: ProjectData }) {
+export default function ClientProjectPage({ projectData }: { projectData: any }) {
   return (
     <Suspense fallback={<LoadingSkeleton />}>
       <ProjectPage projectData={projectData} />

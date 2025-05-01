@@ -42,10 +42,13 @@ export function ApprovalDialog({
     try {
       await approveDeliverable(deliverableId, clientId)
       setOpen(false)
-      if (onApproved) onApproved()
+      
+      // Ajouter un paramètre à l'URL pour indiquer que l'approbation vient de se produire
+      window.location.href = window.location.pathname + '?approved=true';
+      
+      // Plus besoin d'appeler onApproved car la page va se recharger
     } catch (error) {
       console.error("Error approving deliverable:", error)
-    } finally {
       setIsSubmitting(false)
     }
   }

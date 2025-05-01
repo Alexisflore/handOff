@@ -165,12 +165,13 @@ export async function addComment(
       .insert({
         deliverable_id: deliverableId,
         project_id: deliverable.project_id,
-        user_id: userId,
+        user_id: userId !== "system" ? userId : null,
         client_id: clientId,
         content,
         is_client: isClient,
         milestone_name: deliverable.project_steps.title,
         version_name: deliverable.version_name,
+        is_system_message: userId === "system",
       })
       .select()
 
@@ -187,6 +188,11 @@ export async function approveDeliverable(deliverableId: string, clientId: string
   const supabase = createServerSupabaseClient()
 
   try {
+    // Validation des paramètres
+    if (!deliverableId || deliverableId.trim() === "") {
+      throw new Error("deliverableId is required");
+    }
+    
     // Récupérer les informations du livrable
     const { data: deliverable, error: deliverableError } = await supabase
       .from("deliverables")
@@ -253,14 +259,7 @@ export async function approveDeliverable(deliverableId: string, clientId: string
 
     if (projectUpdateError) throw projectUpdateError
 
-    // Ajouter un commentaire d'approbation
-    await addComment(
-      deliverableId,
-      "system",
-      "This deliverable has been approved. The project will now move to the next phase.",
-      true,
-      clientId,
-    )
+    // Commentaire supprimé - plus besoin d'ajouter un commentaire à l'approbation
 
     return { success: true }
   } catch (error) {
@@ -273,6 +272,28 @@ export async function rejectDeliverable(deliverableId: string, clientId: string,
   const supabase = createServerSupabaseClient()
 
   try {
+    // Validation des paramètres
+    if (!deliverableId || deliverableId.trim() === "") {
+      throw new Error("deliverableId is required");
+    }
+    
+    if (!feedback || feedback.trim() === "") {
+      throw new Error("feedback is required");
+    }
+    
+    
+    // Récupérer les informations du livrable pour le commentaire
+    const { data: deliverable, error: deliverableError } = await supabase
+      .from("deliverables")
+      .select(`
+        *,
+        project_steps (*)
+      `)
+      .eq("id", deliverableId)
+      .single()
+
+    if (deliverableError) throw deliverableError
+    
     // Mettre à jour le statut du livrable
     const { error: updateError } = await supabase
       .from("deliverables")
@@ -281,8 +302,39 @@ export async function rejectDeliverable(deliverableId: string, clientId: string,
 
     if (updateError) throw updateError
 
+    // Interface pour typer les données du commentaire
+    interface CommentData {
+      deliverable_id: string;
+      project_id: string;
+      user_id: string;
+      client_id?: string;
+      content: string;
+      is_client: boolean;
+      milestone_name: string;
+      version_name: string;
+    }
+    
     // Ajouter un commentaire avec le feedback
-    await addComment(deliverableId, "system", feedback, true, clientId)
+    const commentData: CommentData = {
+      deliverable_id: deliverableId,
+      project_id: deliverable.project_id,
+      user_id: clientId,
+      content: feedback,
+      is_client: true,
+      milestone_name: deliverable.project_steps.title || "Milestone",
+      version_name: deliverable.version_name || "Version",
+    };
+    
+    // Si clientId existe et n'est pas vide, l'ajouter au commentaire
+    if (clientId && clientId.trim() !== "") {
+      commentData.client_id = clientId;
+    }
+    
+    const { error: commentError } = await supabase
+      .from("comments")
+      .insert(commentData);
+
+    if (commentError) throw commentError
 
     return { success: true }
   } catch (error) {

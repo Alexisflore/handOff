@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: { id: string } }) {
   if (!id || id === "undefined" || id === "[id]") {
     // Au lieu de rediriger, afficher une page d'erreur
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
           <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-4">
             <h2 className="text-lg font-semibold mb-2">Erreur</h2>
@@ -33,12 +33,12 @@ export default async function Page({ params }: { params: { id: string } }) {
   const { data: projectData, error } = await getProjectDetailsAction(id);
   
   // Debug logs
-  console.log("projectData steps:", projectData?.steps?.length || 0);
-  console.log("First step has versions:", projectData?.steps?.[0]?.versions ? "Yes" : "No");
+  console.log("projectData deliverables:", projectData?.deliverables?.length || 0);
+  console.log("First deliverable has versions:", projectData?.deliverables?.[0]?.versions ? "Yes" : "No");
   
   if (error || !projectData) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
           <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-4">
             <h2 className="text-lg font-semibold mb-2">Erreur</h2>

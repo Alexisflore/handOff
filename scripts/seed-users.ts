@@ -31,7 +31,7 @@ async function seedUsers() {
       password: "designerpass123",
       email_confirm: true,
       user_metadata: {
-        role: "designer",
+        role: "DESIGNER",
         custom_id: designerId
       }
     })
@@ -59,7 +59,7 @@ async function seedUsers() {
       password: "clientpass123",
       email_confirm: true,
       user_metadata: {
-        role: "client",
+        role: "CLIENT",
         custom_id: clientId
       }
     })

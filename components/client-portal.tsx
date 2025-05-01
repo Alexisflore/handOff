@@ -11,6 +11,7 @@ import {
   Menu,
   ChevronRight,
   BarChart,
+  ChevronDown,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -59,15 +60,15 @@ interface Version {
 export function ClientPortal({
   project,
   client,
-  milestones,
+  milestones: deliverables,
   freelancer,
   comments: initialComments,
   sharedFiles: initialSharedFiles,
 }: ClientPortalProps) {
   // Vérifier si les données essentielles sont disponibles
-  if (!project || !milestones || milestones.length === 0) {
+  if (!project || !deliverables || deliverables.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex min-h-screen h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
           <div className="bg-amber-100 text-amber-800 p-4 rounded-lg mb-4">
             <h2 className="text-lg font-semibold mb-2">Données incomplètes</h2>
@@ -91,58 +92,132 @@ export function ClientPortal({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const { toast } = useToast()
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [debugInfo, setDebugInfo] = useState<{[key: string]: any}>({})
+  const [showDebug, setShowDebug] = useState(false)
 
   // Récupérer l'utilisateur connecté
   useEffect(() => {
     const fetchCurrentUser = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.error("Erreur de récupération de session:", error)
-        return
-      }
-      
-      if (session && session.user) {
-        // Récupérer les informations détaillées de l'utilisateur depuis la table users
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", session.user.id)
-          .single()
-          
-        if (userError) {
-          console.error("Erreur de récupération des infos utilisateur:", userError)
-          return
+      try {
+        const debugData: {[key: string]: any} = {
+          logs: []
+        };
+        
+        debugData.logs.push("Début de la vérification");
+        
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+        
+        // Récupération de la session
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        debugData.hasSession = !!session;
+        
+        if (error) {
+          debugData.sessionError = error.message;
+          setDebugInfo(debugData);
+          return;
         }
         
-        // Vérifier si c'est un client ou un designer
-        const isDesigner = session.user.id === process.env.NEXT_PUBLIC_DESIGNER_ID
+        if (session && session.user) {
+          debugData.userId = session.user.id;
+          debugData.userEmail = session.user.email;
+          debugData.userMetadata = session.user.user_metadata;
+          debugData.rawSession = JSON.stringify(session, null, 2);
+          
+          try {
+            // Recherche du rôle dans différents endroits possibles
+            const roleFromMetadata = session.user.user_metadata?.role;
+            const roleFromAppMetadata = session.user.app_metadata?.role;
+            
+            debugData.logs.push(`Role from metadata: ${roleFromMetadata || 'none'}`);
+            debugData.logs.push(`Role from app_metadata: ${roleFromAppMetadata || 'none'}`);
+            
+            // Créer un tableau de tous les rôles potentiels
+            const potentialRoles = [
+              roleFromMetadata,
+              roleFromAppMetadata,
+              session.user.role
+            ].filter(Boolean); // Filtrer les valeurs null/undefined
+            
+            debugData.potentialRoles = potentialRoles;
+            
+            // Vérifier si l'un des rôles correspond à "designer" (insensible à la casse)
+            const isDesigner = potentialRoles.some(role => 
+              typeof role === 'string' && role.toLowerCase() === 'designer'
+            );
+            
+            // Vérifier aussi le rôle spécifique "DESIGNER"
+            const isDesignerExact = potentialRoles.some(role => 
+              typeof role === 'string' && role.toUpperCase() === 'DESIGNER'
+            );
+            
+            debugData.isDesignerByAnyCase = isDesigner;
+            debugData.isDesignerExact = isDesignerExact;
+            
+            // Vérifier également l'ID utilisateur comme fallback
+            const isDesignerById = session.user.id === process.env.NEXT_PUBLIC_DESIGNER_ID;
+            debugData.isDesignerById = isDesignerById;
+            
+            // Décision finale: l'utilisateur est un designer si l'un des tests ci-dessus est vrai
+            const finalIsDesigner = isDesigner || isDesignerExact || isDesignerById;
+            debugData.finalIsDesigner = finalIsDesigner;
+            
+            // Si l'utilisateur n'est pas reconnu comme designer mais a un ID de designer,
+            // essayons de mettre à jour les métadonnées pour les futurs chargements
+            if (isDesignerById && !isDesignerExact && !isDesigner) {
+              debugData.logs.push("Tentative de mise à jour des métadonnées car ID designer sans rôle designer");
+              
+              // Mise à jour des métadonnées de l'utilisateur
+              const { error: updateError } = await supabase.auth.updateUser({
+                data: { role: 'DESIGNER' }
+              });
+              
+              if (updateError) {
+                debugData.logs.push(`Erreur mise à jour métadonnées: ${updateError.message}`);
+              } else {
+                debugData.logs.push("Métadonnées mises à jour avec succès");
+              }
+            }
+            
+            setCurrentUser({
+              id: session.user.id,
+              email: session.user.email,
+              role: roleFromMetadata || roleFromAppMetadata || session.user.role || 'unknown',
+              isDesigner: finalIsDesigner
+            });
+          } catch (error: any) {
+            debugData.parseError = error.message;
+          }
+        }
         
-        setCurrentUser({
-          ...userData,
-          isDesigner
-        })
+        setDebugInfo(debugData);
+      } catch (error: any) {
+        setDebugInfo({ globalError: error.message });
       }
     }
     
     fetchCurrentUser()
   }, [])
 
-  // Trouver l'étape actuelle (status = 'current')
-  const currentMilestoneObj = milestones.find((m) => m.status === "current") || milestones[0] || null
+  // Calcul du nombre de livrables approuvés
+  const approvedDeliverables = deliverables.filter(d => d.status === "completed").length
+  const totalDeliverables = deliverables.length
+  const progress = totalDeliverables > 0 ? Math.round((approvedDeliverables / totalDeliverables) * 100) : 0
+
+  // Trouver le livrable actuel (status = 'current')
+  const currentDeliverableObj = deliverables.find((d) => d.status === "current") || deliverables[0] || null
   
-  // Vérifications de sécurité au cas où aucune étape n'est trouvée
-  if (!currentMilestoneObj) {
+  // Vérifications de sécurité au cas où aucun livrable n'est trouvé
+  if (!currentDeliverableObj) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex min-h-screen h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
           <div className="bg-amber-100 text-amber-800 p-4 rounded-lg mb-4">
             <h2 className="text-lg font-semibold mb-2">Données incomplètes</h2>
-            <p>Aucune étape n'a été trouvée pour ce projet.</p>
+            <p>Aucun livrable n'a été trouvé pour ce projet.</p>
           </div>
           <a href="/" className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors inline-block">
             Retour à l'accueil
@@ -152,31 +227,29 @@ export function ClientPortal({
     );
   }
 
-  // Trouver le dernier livrable de l'étape actuelle
-  const currentVersionsArray = currentMilestoneObj?.versions || []
-  const latestVersion =
-    currentVersionsArray.find((v: Version) => v.is_latest) ||
-    (currentVersionsArray.length > 0 ? currentVersionsArray[currentVersionsArray.length - 1] : null)
-
-  // État pour suivre l'étape et le livrable actuellement sélectionnés
-  const [currentMilestone, setCurrentMilestone] = useState(currentMilestoneObj?.id || "")
-  const [currentVersion, setCurrentVersion] = useState(latestVersion?.id || "")
+  // État pour suivre le livrable actuellement sélectionné
+  const [currentMilestone, setCurrentMilestone] = useState(currentDeliverableObj?.id || "")
+  const [currentVersion, setCurrentVersion] = useState(
+    currentDeliverableObj?.versions && Array.isArray(currentDeliverableObj.versions) && currentDeliverableObj.versions.length > 0
+      ? currentDeliverableObj.versions[0].id
+      : ""
+  )
   const [activeTab, setActiveTab] = useState("current")
   const [showComments, setShowComments] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
-  // Trouver l'étape et la version actives
-  const activeMilestone = milestones.find((m) => m.id === currentMilestone) || milestones[0] || null
+  // Trouver le livrable actif
+  const activeDeliverable = deliverables.find((d) => d.id === currentMilestone) || deliverables[0] || null
   
-  // Vérification supplémentaire au cas où activeMilestone est null
-  if (!activeMilestone) {
+  // Vérification supplémentaire au cas où activeDeliverable est null
+  if (!activeDeliverable) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex min-h-screen h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
           <div className="bg-amber-100 text-amber-800 p-4 rounded-lg mb-4">
-            <h2 className="text-lg font-semibold mb-2">Étape introuvable</h2>
-            <p>L'étape sélectionnée n'existe pas dans ce projet.</p>
+            <h2 className="text-lg font-semibold mb-2">Livrable introuvable</h2>
+            <p>Le livrable sélectionné n'existe pas dans ce projet.</p>
           </div>
           <a href="/" className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors inline-block">
             Retour à l'accueil
@@ -186,7 +259,7 @@ export function ClientPortal({
     );
   }
   
-  const activeVersions = activeMilestone.versions || []
+  const activeVersions = activeDeliverable.versions || []
   const activeVersion =
     activeVersions.find((v: Version) => v.id === currentVersion) ||
     (activeVersions.length > 0 ? activeVersions[activeVersions.length - 1] : null)
@@ -200,9 +273,18 @@ export function ClientPortal({
       setIsRefreshing(true)
       const data = await getProjectDetails(project.id)
       if (data) {
+        // Mettre à jour les données locales
         setComments(data.comments)
         setSharedFiles(data.sharedFiles)
-
+        
+        // Si venant d'une approbation, force reload
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('approved') === 'true') {
+          // Forcer le rechargement de la page pour voir les modifications
+          window.location.reload();
+          return;
+        }
+        
         toast({
           title: "Données actualisées",
           description: "Les données du projet ont été actualisées avec succès.",
@@ -218,6 +300,70 @@ export function ClientPortal({
       })
     } finally {
       setIsRefreshing(false)
+    }
+  }
+
+  // Fonction pour ajouter une nouvelle version
+  const handleAddNewVersion = () => {
+    // Ouvrir le modal pour ajouter une nouvelle version
+    const elem = document.getElementById('add-version-modal');
+    if (elem) {
+      elem.classList.remove('hidden');
+    }
+  }
+
+  // Fonction pour fermer le modal d'ajout de version
+  const closeAddVersionModal = () => {
+    const elem = document.getElementById('add-version-modal');
+    if (elem) {
+      elem.classList.add('hidden');
+    }
+  }
+
+  // Fonction pour soumettre une nouvelle version
+  const submitNewVersion = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    // Récupérer les données du formulaire
+    const formElement = event.target as HTMLFormElement;
+    const formData = new FormData(formElement);
+    
+    const versionName = formData.get('versionName') as string;
+    const versionDescription = formData.get('versionDescription') as string;
+    const file = formData.get('file') as File;
+    
+    if (!versionName || !file) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // TODO: Implémenter l'appel API pour ajouter une nouvelle version
+      // Cette partie devrait être implémentée selon votre API
+      
+      // Exemple simulé:
+      toast({
+        title: "Version ajoutée",
+        description: "La nouvelle version a été ajoutée avec succès.",
+      });
+      
+      // Fermer le modal
+      closeAddVersionModal();
+      
+      // Rafraîchir les données
+      refreshProjectData();
+      
+    } catch (error) {
+      console.error("Error adding new version:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de l'ajout de la nouvelle version.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -255,8 +401,8 @@ export function ClientPortal({
         setComments((prev) => [...prev, commentWithUserInfo])
       }
 
-      // Force focus on current milestone after sending a comment
-      const commentThreadElement = document.querySelector('[data-filter="milestone"]')
+      // Force focus on current deliverable after sending a comment
+      const commentThreadElement = document.querySelector('[data-filter="deliverable"]')
       if (commentThreadElement) {
         ;(commentThreadElement as HTMLButtonElement).click()
       }
@@ -274,12 +420,12 @@ export function ClientPortal({
   const handleVersionChange = (versionId: string) => {
     setCurrentVersion(versionId)
 
-    // Trouver l'étape à laquelle appartient cette version
-    for (const milestone of milestones) {
-      if (milestone.versions) {
-        const versionExists = milestone.versions.some((v: Version) => v.id === versionId)
+    // Trouver le livrable auquel appartient cette version
+    for (const deliverable of deliverables) {
+      if (deliverable.versions) {
+        const versionExists = deliverable.versions.some((v: Version) => v.id === versionId)
         if (versionExists) {
-          setCurrentMilestone(milestone.id)
+          setCurrentMilestone(deliverable.id)
           break
         }
       }
@@ -290,21 +436,21 @@ export function ClientPortal({
     }
   }
 
-  const handleMilestoneClick = (milestone: any) => {
-    // Ne pas permettre de cliquer sur les milestones à venir
-    if (milestone.status === "upcoming") return
+  const handleMilestoneClick = (deliverable: any) => {
+    // Ne pas permettre de cliquer sur les livrables à venir
+    if (deliverable.status === "upcoming") return
 
-    // Permettre de cliquer sur les milestones complétés et le milestone en cours
-    if (milestone.status === "completed" || milestone.status === "current") {
-      setCurrentMilestone(milestone.id)
+    // Permettre de cliquer sur les livrables complétés et le livrable en cours
+    if (deliverable.status === "completed" || deliverable.status === "current") {
+      setCurrentMilestone(deliverable.id)
 
-      // Définir la version actuelle comme la dernière version de cette étape
-      const selectedMilestone = milestones.find((m) => m.id === milestone.id)
-      if (selectedMilestone && selectedMilestone.versions && selectedMilestone.versions.length > 0) {
+      // Définir la version actuelle comme la dernière version de ce livrable
+      const selectedDeliverable = deliverables.find((d) => d.id === deliverable.id)
+      if (selectedDeliverable && selectedDeliverable.versions && selectedDeliverable.versions.length > 0) {
         // Trouver la dernière version ou celle marquée comme is_latest
         const latestVersion =
-          selectedMilestone.versions.find((v: Version) => v.is_latest) ||
-          selectedMilestone.versions[selectedMilestone.versions.length - 1]
+          selectedDeliverable.versions.find((v: Version) => v.is_latest) ||
+          selectedDeliverable.versions[selectedDeliverable.versions.length - 1]
         setCurrentVersion(latestVersion.id)
       }
 
@@ -323,11 +469,11 @@ export function ClientPortal({
   }
 
   // Adapter les données pour le composant SubtleMilestone
-  const milestonesForComponent = milestones.map((m) => ({
-    id: m.id,
-    title: m.title,
-    status: m.status,
-    icon: m.icon ? <span>{m.icon}</span> : undefined,
+  const deliverablesForComponent = deliverables.map((d) => ({
+    id: d.id,
+    title: d.title,
+    status: d.status,
+    icon: d.icon ? <span>{d.icon}</span> : undefined,
   }))
 
   // Adapter les données pour le composant HoverVersionSelector
@@ -348,8 +494,8 @@ export function ClientPortal({
     },
     content: c.content,
     timestamp: new Date(c.created_at).toLocaleString(),
-    milestoneId: activeMilestone.id,
-    milestoneName: c.milestone_name || activeMilestone.title,
+    milestoneId: activeDeliverable.id,
+    milestoneName: c.deliverable_name || activeDeliverable.title,
     versionId: c.deliverable_id,
     versionName: c.version_name || activeVersion?.version_name,
     isClient: c.is_client,
@@ -357,7 +503,82 @@ export function ClientPortal({
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
+      <div className="flex min-h-screen h-screen w-full bg-white overflow-hidden">
+        {/* Debug panel */}
+        <div className="fixed top-0 right-0 z-50 p-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowDebug(!showDebug)}
+            className="h-6 text-xs"
+          >
+            {showDebug ? "Hide Debug" : "Show Debug"}
+          </Button>
+          
+          {showDebug && (
+            <div className="bg-white border p-4 shadow-lg mt-1 rounded-md max-w-md max-h-96 overflow-auto">
+              <h3 className="font-bold text-sm mb-2">Debug Info</h3>
+              <div className="text-xs space-y-1">
+                <p><b>User Info:</b> {currentUser ? `${currentUser.email} (${currentUser.role})` : 'Not logged in'}</p>
+                <p><b>Is Designer:</b> {currentUser?.isDesigner ? 'Yes ✅' : 'No ❌'}</p>
+                <p><b>Session:</b> {debugInfo.hasSession ? 'Yes' : 'No'}</p>
+                <p><b>User ID:</b> {debugInfo.userId || 'N/A'}</p>
+                <p><b>Designer ID Env:</b> {process.env.NEXT_PUBLIC_DESIGNER_ID || 'Not set'}</p>
+                <p><b>Role in Metadata:</b> {debugInfo.userMetadata?.role || 'None'}</p>
+                <p><b>Role Direct:</b> {debugInfo.userRole || 'None'}</p>
+                <p><b>Designer by Metadata:</b> {debugInfo.isDesignerByAnyCase ? 'Yes' : 'No'}</p>
+                <p><b>Designer Exact:</b> {debugInfo.isDesignerExact ? 'Yes' : 'No'}</p>
+                <p><b>Designer by ID:</b> {debugInfo.isDesignerById ? 'Yes' : 'No'}</p>
+                <p><b>Final Result:</b> {debugInfo.finalIsDesigner ? 'Is Designer' : 'Not Designer'}</p>
+                
+                {debugInfo.globalError && <p className="text-red-500"><b>Error:</b> {debugInfo.globalError}</p>}
+                
+                {debugInfo.logs && debugInfo.logs.length > 0 && (
+                  <div className="mt-2 border-t pt-2">
+                    <h4 className="font-bold mb-1">Logs:</h4>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {debugInfo.logs.map((log: string, index: number) => (
+                        <li key={index}>{log}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {debugInfo.potentialRoles && debugInfo.potentialRoles.length > 0 && (
+                  <div className="mt-2 border-t pt-2">
+                    <h4 className="font-bold mb-1">Potential Roles:</h4>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {debugInfo.potentialRoles.map((role: string, index: number) => (
+                        <li key={index}>{role}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <div className="mt-2 border-t pt-2">
+                  <button 
+                    onClick={() => window.location.reload()} 
+                    className="text-blue-500 underline hover:text-blue-700"
+                  >
+                    Refresh Page
+                  </button>
+                  <button 
+                    onClick={() => {
+                      localStorage.clear();
+                      sessionStorage.clear();
+                      alert('Local storage cleared. Page will reload.');
+                      window.location.reload();
+                    }} 
+                    className="text-blue-500 underline hover:text-blue-700 ml-4"
+                  >
+                    Clear Storage & Reload
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
         {/* Sidebar - with client branding */}
         <div
           className={`transition-all duration-300 ease-in-out ${
@@ -403,11 +624,6 @@ export function ClientPortal({
                   Due: {new Date(project.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
               </div>
-              {sidebarCollapsed && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
-                  {project.progress}%
-                </Badge>
-              )}
             </div>
 
             {/* Navigation */}
@@ -478,26 +694,21 @@ export function ClientPortal({
               </div>
             </nav>
 
-            {/* Project progress */}
+            {/* Deliverables info - remplace Project Progress */}
             <div className={`p-4 border-t ${sidebarCollapsed ? "hidden" : "block"}`}>
-              <div className="flex justify-between items-center text-sm mb-2">
-                <h3 className="font-medium">Project Progress</h3>
-                <span className="font-medium">{project.progress}%</span>
+              <div className="flex items-center text-sm mb-2">
+                <h3 className="font-medium">Deliverables</h3>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                <div
-                  className="h-full bg-teal-500 rounded-full shadow-sm"
-                  style={{ width: `${project.progress}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {milestones.filter((m) => m.status === "completed").length} of {milestones.length} milestones
-                </span>
-                <span>
-                  {Math.round((new Date(project.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
-                  days left
-                </span>
+              <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>
+                    {approvedDeliverables} of {totalDeliverables} approved
+                  </span>
+                  <span>
+                    {Math.round((new Date(project.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
+                    days left
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -552,108 +763,98 @@ export function ClientPortal({
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Mobile Sidebar */}
-          {mobileSidebarOpen && (
-            <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={() => setMobileSidebarOpen(false)}>
-              <div
-                className="absolute left-0 top-0 h-full w-64 bg-white p-4 shadow-lg"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={client.logo_url || "/placeholder.svg"} alt={client.company} />
-                      <AvatarFallback className="bg-blue-100 text-blue-700">{client.initials}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">{client.company}</p>
-                      <p className="text-xs text-muted-foreground">{client.name}</p>
-                    </div>
+        {/* Mobile sidebar drawer */}
+        <div className={`md:hidden fixed inset-0 z-50 bg-black/50 ${mobileSidebarOpen ? "block" : "hidden"}`} onClick={() => setMobileSidebarOpen(false)}>
+          <div className="h-full w-64 bg-white" onClick={(e) => e.stopPropagation()}>
+            {/* Mobile sidebar content */}
+            <div className="flex h-full flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={client.logo_url || "/placeholder.svg"} alt={client.company} />
+                    <AvatarFallback className="bg-blue-100 text-blue-700">{client.initials}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium text-sm">{client.company}</p>
+                    <p className="text-xs text-muted-foreground">{client.name}</p>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileSidebarOpen(false)}>
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileSidebarOpen(false)}>
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </Button>
+              </div>
+
+              <div className="mb-4">
+                <h2 className="text-base font-semibold mb-1">{project.title}</h2>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
+                    {project.status === "in_progress" ? "In Progress" : project.status}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">Project #{project.project_number}</p>
+                </div>
+              </div>
+
+              <nav className="mb-4">
+                <h3 className="text-xs font-medium mb-3 text-muted-foreground uppercase tracking-wider">
+                  Navigation
+                </h3>
+                <div className="space-y-2">
+                  <Button
+                    variant={activeTab === "dashboard" ? "default" : "ghost"}
+                    className="w-full justify-start gap-2 h-9 text-sm"
+                    onClick={() => {
+                      setActiveTab("dashboard")
+                      setMobileSidebarOpen(false)
+                    }}
+                  >
+                    <BarChart className="h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Button>
+                  <Button
+                    variant={activeTab === "current" ? "default" : "ghost"}
+                    className="w-full justify-start gap-2 h-9 text-sm"
+                    onClick={() => {
+                      setActiveTab("current")
+                      setMobileSidebarOpen(false)
+                    }}
+                  >
+                    <Clock className="h-4 w-4" />
+                    <span>Current Deliverable</span>
+                  </Button>
+                  <Button
+                    variant={activeTab === "history" ? "default" : "ghost"}
+                    className="w-full justify-start gap-2 h-9 text-sm"
+                    onClick={() => {
+                      setActiveTab("history")
+                      setMobileSidebarOpen(false)
+                    }}
+                  >
+                    <History className="h-4 w-4" />
+                    <span>Version History</span>
+                  </Button>
+                  <Button
+                    variant={activeTab === "my-files" ? "default" : "ghost"}
+                    className="w-full justify-start gap-2 h-9 text-sm"
+                    onClick={() => {
+                      setActiveTab("my-files")
+                      setMobileSidebarOpen(false)
+                    }}
+                  >
+                    <FileIcon className="h-4 w-4" />
+                    <span>Files</span>
                   </Button>
                 </div>
+              </nav>
 
-                <div className="mb-4">
-                  <h2 className="text-base font-semibold mb-1">{project.title}</h2>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
-                      {project.status === "in_progress" ? "In Progress" : project.status}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">Project #{project.project_number}</p>
-                  </div>
+              <div className="mb-4">
+                <div className="flex items-center text-sm mb-2">
+                  <h3 className="font-medium">Deliverables</h3>
                 </div>
-
-                <nav className="mb-4">
-                  <h3 className="text-xs font-medium mb-3 text-muted-foreground uppercase tracking-wider">
-                    Navigation
-                  </h3>
-                  <div className="space-y-2">
-                    <Button
-                      variant={activeTab === "dashboard" ? "default" : "ghost"}
-                      className="w-full justify-start gap-2 h-9 text-sm"
-                      onClick={() => {
-                        setActiveTab("dashboard")
-                        setMobileSidebarOpen(false)
-                      }}
-                    >
-                      <BarChart className="h-4 w-4" />
-                      <span>Dashboard</span>
-                    </Button>
-                    <Button
-                      variant={activeTab === "current" ? "default" : "ghost"}
-                      className="w-full justify-start gap-2 h-9 text-sm"
-                      onClick={() => {
-                        setActiveTab("current")
-                        setMobileSidebarOpen(false)
-                      }}
-                    >
-                      <Clock className="h-4 w-4" />
-                      <span>Current Deliverable</span>
-                    </Button>
-                    <Button
-                      variant={activeTab === "history" ? "default" : "ghost"}
-                      className="w-full justify-start gap-2 h-9 text-sm"
-                      onClick={() => {
-                        setActiveTab("history")
-                        setMobileSidebarOpen(false)
-                      }}
-                    >
-                      <History className="h-4 w-4" />
-                      <span>Version History</span>
-                    </Button>
-                    <Button
-                      variant={activeTab === "my-files" ? "default" : "ghost"}
-                      className="w-full justify-start gap-2 h-9 text-sm"
-                      onClick={() => {
-                        setActiveTab("my-files")
-                        setMobileSidebarOpen(false)
-                      }}
-                    >
-                      <FileIcon className="h-4 w-4" />
-                      <span>Files</span>
-                    </Button>
-                  </div>
-                </nav>
-
-                <div className="mb-4">
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <h3 className="font-medium">Project Progress</h3>
-                    <span className="font-medium">{project.progress}%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                    <div
-                      className="h-full bg-teal-500 rounded-full shadow-sm"
-                      style={{ width: `${project.progress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
                     <span>
-                      {milestones.filter((m) => m.status === "completed").length} of {milestones.length} milestones
+                      {approvedDeliverables} of {totalDeliverables} approved
                     </span>
                     <span>
                       {Math.round(
@@ -663,157 +864,182 @@ export function ClientPortal({
                     </span>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-auto pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={freelancer?.users?.avatar_url || "/placeholder.svg"}
-                        alt={freelancer?.users?.full_name}
-                      />
-                      <AvatarFallback className="bg-teal-100 text-teal-700">{freelancer?.initials}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {freelancer?.users?.full_name} • {freelancer?.company}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{freelancer?.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center mt-2">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      Powered by
-                      <img
-                        src="/placeholder.svg?height=16&width=16&text=H"
-                        alt="Handoff"
-                        className="h-4 w-4 inline-block"
-                      />
-                      <span className="font-medium">Handoff</span>
+              <div className="mt-auto pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={freelancer?.users?.avatar_url || "/placeholder.svg"}
+                      alt={freelancer?.users?.full_name}
+                    />
+                    <AvatarFallback className="bg-teal-100 text-teal-700">{freelancer?.initials}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {freelancer?.users?.full_name} • {freelancer?.company}
                     </p>
+                    <p className="text-xs text-muted-foreground">{freelancer?.role}</p>
                   </div>
+                </div>
+                <div className="flex items-center mt-2">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    Powered by
+                    <img
+                      src="/placeholder.svg?height=16&width=16&text=H"
+                      alt="Handoff"
+                      className="h-4 w-4 inline-block"
+                    />
+                    <span className="font-medium">Handoff</span>
+                  </p>
                 </div>
               </div>
             </div>
-          )}
-          {/* Mobile Header */}
-          <header className="flex h-14 items-center justify-between border-b bg-white px-4 md:hidden">
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMobileSidebarOpen(true)}>
-                <Menu className="h-4 w-4" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={client.logo_url || "/placeholder.svg"} alt={client.company} />
-                  <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">{client.initials}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-medium">{project.title}</p>
-                  <p className="text-xs text-muted-foreground">{client.company}</p>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Content Area - Removed mobile header */}
+          <main className="flex flex-1 flex-col p-4 overflow-auto min-h-0">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full h-full flex flex-col overflow-hidden"
+            >
+              <div className="flex items-center justify-between flex-shrink-0 mb-2">
+                <TabsList className="h-9">
+                  <TabsTrigger value="dashboard" className="px-3 text-sm">
+                    Dashboard
+                  </TabsTrigger>
+                  <TabsTrigger value="current" className="px-3 text-sm">
+                    Current Deliverable
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="px-3 text-sm">
+                    History
+                  </TabsTrigger>
+                  <TabsTrigger value="my-files" className="px-3 text-sm">
+                    Files
+                  </TabsTrigger>
+                </TabsList>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5"
+                    onClick={refreshProjectData}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? "Actualisation..." : "Actualiser"}
+                  </Button>
+                  <RealtimeNotifications projectId={project.id} userId={currentUser?.id || process.env.NEXT_PUBLIC_DESIGNER_ID || "550e8400-e29b-41d4-a716-446655440001"} />
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <RealtimeNotifications projectId={project.id} userId={currentUser?.id || process.env.NEXT_PUBLIC_DESIGNER_ID || "550e8400-e29b-41d4-a716-446655440001"} />
-              <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                <MessageSquare className="h-4 w-4" />
-                <span className="sr-only">Contact</span>
-              </Button>
-            </div>
-          </header>
 
-          {/* Content Area */}
-          <main className="flex flex-1 flex-col p-4 overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full h-full flex flex-col overflow-hidden"
-              >
-                <div className="flex items-center justify-between flex-shrink-0 mb-2">
-                  <TabsList className="h-9">
-                    <TabsTrigger value="dashboard" className="px-3 text-sm">
-                      Dashboard
-                    </TabsTrigger>
-                    <TabsTrigger value="current" className="px-3 text-sm">
-                      Current Deliverable
-                    </TabsTrigger>
-                    <TabsTrigger value="history" className="px-3 text-sm">
-                      History
-                    </TabsTrigger>
-                    <TabsTrigger value="my-files" className="px-3 text-sm">
-                      Files
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-1.5"
-                      onClick={refreshProjectData}
-                      disabled={isRefreshing}
-                    >
-                      {isRefreshing ? "Actualisation..." : "Actualiser"}
-                    </Button>
-                    <RealtimeNotifications projectId={project.id} userId={currentUser?.id || process.env.NEXT_PUBLIC_DESIGNER_ID || "550e8400-e29b-41d4-a716-446655440001"} />
-                  </div>
-                </div>
-
-                <TabsContent value="dashboard" className="flex-1 overflow-auto mt-0">
+              <div className="overflow-hidden flex-1 flex flex-col min-h-0">
+                <TabsContent value="dashboard" className="flex-1 overflow-auto mt-0 h-full">
                   <ProjectDashboard projectId={project.id} />
                 </TabsContent>
 
-                <TabsContent value="current" className="flex-1 flex flex-col overflow-hidden">
-                  <div className="flex flex-col space-y-4 overflow-hidden h-full">
-                    {/* Milestone progress */}
-                    <div className="flex-shrink-0">
-                      <SubtleMilestone
-                        milestones={milestonesForComponent}
-                        onMilestoneClick={handleMilestoneClick}
-                        currentMilestone={currentMilestone}
-                      />
-                    </div>
-
+                <TabsContent value="current" className="flex-1 flex flex-col overflow-auto h-full">
+                  <div className="flex flex-col space-y-4 h-full">
                     {/* Deliverable header */}
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-l-4 border-l-teal-500 bg-white p-4 rounded-md shadow-sm hover:shadow transition-shadow duration-200">
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h1 className="text-lg font-semibold">
-                            {activeMilestone.title}: {activeVersion?.version_name}
+                            {activeDeliverable.title}
                           </h1>
+                          
                           <Badge
                             variant="outline"
                             className={
-                              activeMilestone.status === "completed"
+                              activeDeliverable.status === "completed"
                                 ? "bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors border-green-200"
                                 : "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 transition-colors border-amber-200"
                             }
                           >
-                            {activeMilestone.status === "completed" ? "Approved" : "Awaiting Review"}
+                            {activeDeliverable.status === "completed" ? "Approved" : "Awaiting Review"}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {activeVersion?.description || activeMilestone.description}
+                          {activeVersion?.description || activeDeliverable.description}
                         </p>
                       </div>
-                      {activeVersions.length > 1 && (
-                        <div className="flex items-center gap-2 mt-1 md:mt-0">
-                          <HoverVersionSelector
-                            versions={versionsForSelector}
-                            currentVersion={currentVersion}
-                            onVersionChange={handleVersionChange}
-                          />
+                      
+                      {/* Bouton de version discret à droite */}
+                      <div className="relative flex-shrink-0 self-start md:self-center flex items-center gap-2">
+                        {/* Bouton "Add a new version" visible uniquement pour les designers */}
+                        {currentUser?.isDesigner ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 flex items-center gap-1.5 text-sm border-teal-600 text-teal-700 hover:bg-teal-50"
+                            onClick={handleAddNewVersion}
+                          >
+                            <span>Add a new version</span>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-400">Designer tools not available</span>
+                        )}
+                        
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 px-3 flex items-center gap-1.5 text-sm bg-teal-600 hover:bg-teal-700"
+                          onClick={() => {
+                            const elem = document.getElementById('version-dropdown');
+                            if (elem) {
+                              elem.classList.toggle('hidden');
+                            }
+                          }}
+                        >
+                          <span>Version {activeVersion?.version_name?.match(/\d+/)?.[0] || "1"}</span>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                        
+                        {/* Dropdown menu for versions */}
+                        <div 
+                          id="version-dropdown"
+                          className="absolute right-0 top-full mt-1 z-50 w-48 hidden"
+                        >
+                          <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
+                            {/* Si activeVersions est vide ou n'a qu'un seul élément, on affiche "Version 1" */}
+                            {(activeVersions.length <= 1) ? (
+                              <div
+                                className="px-3 py-1.5 text-sm cursor-pointer bg-gray-100 font-medium"
+                              >
+                                Version 1
+                              </div>
+                            ) : (
+                              activeVersions.map((version: Version, index: number) => (
+                                <div
+                                  key={version.id}
+                                  className={`px-3 py-1.5 text-sm cursor-pointer ${version.id === activeVersion?.id ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}
+                                  onClick={(e) => {
+                                    handleVersionChange(version.id);
+                                    const elem = document.getElementById('version-dropdown');
+                                    if (elem) {
+                                      elem.classList.add('hidden');
+                                    }
+                                  }}
+                                >
+                                  Version {version.version_name || (index + 1)}
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Main content area - using flex-1 to take all available space */}
-                    <div className="flex flex-1 flex-col lg:flex-row gap-4 min-h-0">
+                    <div className="flex flex-1 flex-col lg:flex-row gap-4 min-h-0 overflow-hidden">
                       {/* Left column - File preview */}
-                      <div className={`flex-1 ${showComments ? "lg:w-2/3" : "lg:w-full"}`}>
-                        <Card className="h-full flex flex-col shadow-sm hover:shadow transition-shadow duration-200 border-slate-200">
-                          <CardHeader className="flex-row items-center justify-between space-y-0 py-3 px-4 border-b">
+                      <div className={`flex-1 ${showComments ? "lg:w-2/3" : "lg:w-full"} min-h-0 flex flex-col`}>
+                        <Card className="h-full flex flex-col shadow-sm hover:shadow transition-shadow duration-200 border-slate-200 overflow-hidden">
+                          <CardHeader className="flex-row items-center justify-between space-y-0 py-3 px-4 border-b flex-shrink-0">
                             <CardTitle className="text-sm font-medium">Preview</CardTitle>
                             <div className="flex items-center gap-2">
                               <Tooltip>
@@ -836,13 +1062,13 @@ export function ClientPortal({
                               </Tooltip>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-0 flex-1">
+                          <CardContent className="p-0 flex-1 overflow-auto min-h-0">
                             {activeVersion && (
                               <FilePreview
                                 fileType={activeVersion.file_type || "image"}
                                 fileName={
                                   activeVersion.file_name ||
-                                  `${activeMilestone.title}_${activeVersion.version_name}.${activeVersion.file_type === "pdf" ? "pdf" : "png"}`
+                                  `${activeDeliverable.title}_${activeVersion.version_name}.${activeVersion.file_type === "pdf" ? "pdf" : "png"}`
                                 }
                                 fileUrl={
                                   activeVersion.file_url ||
@@ -856,8 +1082,8 @@ export function ClientPortal({
 
                       {/* Right column - Comments */}
                       {showComments && (
-                        <div className="lg:w-1/3 h-full">
-                          <Card className="h-full flex flex-col shadow-sm hover:shadow transition-shadow duration-200 border-slate-200">
+                        <div className="lg:w-1/3 h-full min-h-0 flex flex-col">
+                          <Card className="h-full flex flex-col shadow-sm hover:shadow transition-shadow duration-200 border-slate-200 overflow-hidden">
                             <EnhancedCommentThread
                               allComments={commentsForThread}
                               currentMilestone={currentMilestone}
@@ -873,36 +1099,49 @@ export function ClientPortal({
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-md shadow-sm hover:shadow transition-shadow duration-200">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
                         <div>
-                          <p className="text-sm font-medium">
-                            Delivered on{" "}
-                            {activeVersion ? new Date(activeVersion.created_at).toLocaleDateString() : "N/A"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Waiting for your approval</p>
+                          <div>
+                            <p className="text-sm font-medium">
+                              Delivered on {activeVersion ? new Date(activeVersion.created_at).toLocaleDateString() : "N/A"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {activeVersion?.status === "approved" 
+                                ? "Approved" 
+                                : activeVersion?.status === "rejected"
+                                  ? "Changes requested"
+                                  : "Waiting for your approval"}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
-                      <ApprovalDialog
-                        deliverableId={activeVersion?.id || ""}
-                        clientId={client.id}
-                        isApproved={activeVersion?.status === "approved"}
-                        onApproved={() => {
-                          // Dans une application réelle, vous rechargeriez les données ici
-                          refreshProjectData()
-                        }}
-                        onRejected={() => {
-                          // Dans une application réelle, vous rechargeriez les données ici
-                          refreshProjectData()
-                        }}
-                      />
+                      {activeVersion && activeVersion.id ? (
+                        <ApprovalDialog
+                          deliverableId={activeVersion.id}
+                          clientId={client.id}
+                          isApproved={activeVersion.status === "approved"}
+                          onApproved={() => {
+                            // Dans une application réelle, vous rechargeriez les données ici
+                            refreshProjectData()
+                          }}
+                          onRejected={() => {
+                            // Dans une application réelle, vous rechargeriez les données ici
+                            refreshProjectData()
+                          }}
+                        />
+                      ) : (
+                        <Button disabled className="w-full sm:w-auto gap-2 h-9 bg-slate-100 text-slate-700 opacity-50">
+                          <span>No Version Available</span>
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="history" className="flex-1 overflow-auto mt-0">
-                  <ProjectHistory milestones={milestones} onViewVersion={handleVersionChange} comments={comments} />
+                <TabsContent value="history" className="flex-1 overflow-auto mt-0 h-full">
+                  <ProjectHistory milestones={deliverables} onViewVersion={handleVersionChange} comments={comments} />
                 </TabsContent>
 
-                <TabsContent value="my-files" className="flex-1 overflow-auto mt-0">
+                <TabsContent value="my-files" className="flex-1 overflow-auto mt-0 h-full">
                   <ProjectFiles
                     files={sharedFiles}
                     projectId={project.id}
@@ -910,9 +1149,65 @@ export function ClientPortal({
                     onFileDeleted={refreshProjectData}
                   />
                 </TabsContent>
-              </Tabs>
-            </div>
+              </div>
+            </Tabs>
           </main>
+        </div>
+        
+        {/* Modal pour ajouter une nouvelle version */}
+        <div id="add-version-modal" className="fixed inset-0 z-50 bg-black/50 hidden">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-md shadow-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add a new version</h3>
+            
+            <form onSubmit={submitNewVersion} className="space-y-4">
+              <div>
+                <label htmlFor="versionName" className="block text-sm font-medium mb-1">Version Name*</label>
+                <input 
+                  type="text" 
+                  id="versionName" 
+                  name="versionName" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. Version 2"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="versionDescription" className="block text-sm font-medium mb-1">Description</label>
+                <textarea 
+                  id="versionDescription" 
+                  name="versionDescription"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Describe the changes in this version..."
+                  rows={3}
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="file" className="block text-sm font-medium mb-1">Upload File*</label>
+                <input 
+                  type="file" 
+                  id="file" 
+                  name="file"
+                  className="w-full border border-gray-300 rounded-md p-2"
+                  required
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={closeAddVersionModal}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Add Version
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </TooltipProvider>
