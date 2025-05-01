@@ -12,6 +12,7 @@ import {
   ChevronRight,
   BarChart,
   ChevronDown,
+  LogOut,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -32,6 +33,7 @@ import { ProjectDashboard } from "@/components/project-dashboard"
 import { RealtimeNotifications } from "@/components/realtime-notifications"
 import { useToast } from "@/components/ui/use-toast"
 import { createBrowserClient } from "@supabase/ssr"
+import { useRouter } from "next/navigation"
 
 // Définir les types pour les props
 interface ClientPortalProps {
@@ -94,6 +96,7 @@ export function ClientPortal({
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [debugInfo, setDebugInfo] = useState<{[key: string]: any}>({})
   const [showDebug, setShowDebug] = useState(false)
+  const router = useRouter()
 
   // Récupérer l'utilisateur connecté
   useEffect(() => {
@@ -501,6 +504,28 @@ export function ClientPortal({
     isClient: c.is_client,
   }))
 
+  // Fonction de déconnexion
+  const handleLogout = async () => {
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
+      await supabase.auth.signOut()
+      
+      // Redirection vers la page de connexion
+      router.push('/login')
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de se déconnecter. Veuillez réessayer.",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="flex min-h-screen h-screen w-full bg-white overflow-hidden">
@@ -691,6 +716,20 @@ export function ClientPortal({
                   </TooltipTrigger>
                   {sidebarCollapsed && <TooltipContent side="right">Files</TooltipContent>}
                 </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className={`w-full justify-${sidebarCollapsed ? "center" : "start"} gap-2 h-9 text-sm text-red-500 hover:text-red-600 hover:bg-red-50`}
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className={sidebarCollapsed ? "hidden" : "block"}>Déconnexion</span>
+                    </Button>
+                  </TooltipTrigger>
+                  {sidebarCollapsed && <TooltipContent side="right">Déconnexion</TooltipContent>}
+                </Tooltip>
               </div>
             </nav>
 
@@ -768,7 +807,7 @@ export function ClientPortal({
           <div className="h-full w-64 bg-white" onClick={(e) => e.stopPropagation()}>
             {/* Mobile sidebar content */}
             <div className="flex h-full flex-col">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center p-4 border-b">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={client.logo_url || "/placeholder.svg"} alt={client.company} />
@@ -781,7 +820,6 @@ export function ClientPortal({
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileSidebarOpen(false)}>
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
                 </Button>
               </div>
 
@@ -843,6 +881,15 @@ export function ClientPortal({
                   >
                     <FileIcon className="h-4 w-4" />
                     <span>Files</span>
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className="w-full justify-start gap-2 h-9 text-sm text-red-500 hover:text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Déconnexion
                   </Button>
                 </div>
               </nav>
@@ -1118,6 +1165,7 @@ export function ClientPortal({
                         <ApprovalDialog
                           deliverableId={activeVersion.id}
                           clientId={client.id}
+                          user_id={currentUser?.id}
                           isApproved={activeVersion.status === "approved"}
                           onApproved={() => {
                             // Dans une application réelle, vous rechargeriez les données ici

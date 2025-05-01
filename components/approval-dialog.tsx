@@ -18,6 +18,7 @@ import { approveDeliverable, rejectDeliverable } from "@/services/project-servic
 interface ApprovalDialogProps {
   deliverableId: string
   clientId: string
+  user_id?: string
   onApproved?: () => void
   onRejected?: () => void
   isApproved?: boolean
@@ -26,6 +27,7 @@ interface ApprovalDialogProps {
 export function ApprovalDialog({
   deliverableId,
   clientId,
+  user_id,
   onApproved,
   onRejected,
   isApproved = false,
@@ -58,7 +60,10 @@ export function ApprovalDialog({
 
     setIsSubmitting(true)
     try {
-      await rejectDeliverable(deliverableId, clientId, feedback)
+      // Utiliser l'ID de l'utilisateur connecté ou une valeur par défaut
+      const effectiveUserId = user_id || clientId || "00000000-0000-0000-0000-000000000000";
+      
+      await rejectDeliverable(deliverableId, clientId, feedback, effectiveUserId)
       setOpen(false)
       if (onRejected) onRejected()
     } catch (error) {

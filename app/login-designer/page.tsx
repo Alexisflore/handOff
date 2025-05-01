@@ -14,7 +14,7 @@ export default function LoginDesignerPage() {
   const [currentSession, setCurrentSession] = useState<any>(null)
   const router = useRouter()
   
-  const designerId = process.env.NEXT_PUBLIC_DESIGNER_ID || "550e8400-e29b-41d4-a716-446655440001"
+  const designerId = "550e8400-e29b-41d4-a716-446655440001"
 
   // Vérifier la session actuelle au chargement
   useEffect(() => {
@@ -49,9 +49,15 @@ export default function LoginDesignerPage() {
       setLoading(true)
       setError(null)
       
-      // Appeler une API de connexion
+      // Appeler une API de connexion avec l'ID du designer
       const response = await fetch("/api/auth/designer-login", {
         method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          designerId: designerId
+        })
       })
       
       const data = await response.json()
@@ -68,12 +74,35 @@ export default function LoginDesignerPage() {
       // Vérifier la session mise à jour
       await checkCurrentSession();
       
-      // Ne pas rediriger automatiquement pour permettre de voir les infos de debug
+      // Rediriger vers le projet après 2 secondes
+      setTimeout(() => {
+        router.push("/projects/550e8400-e29b-41d4-a716-446655440020");
+      }, 2000);
     } catch (err) {
       console.error("Erreur:", err)
       setError(`Une erreur s'est produite: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      setLoading(true);
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      await supabase.auth.signOut();
+      setCurrentSession(null);
+      setSuccess(false);
+      setSessionInfo(null);
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion:", err);
+      setError(`Erreur de déconnexion: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -89,7 +118,7 @@ export default function LoginDesignerPage() {
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-muted-foreground mb-2">
-              Vous allez vous connecter avec l'ID :
+              Vous allez vous connecter avec l'ID fixe :
             </p>
             <code className="bg-slate-100 p-2 rounded-md text-xs block overflow-auto">
               {designerId}
@@ -102,6 +131,9 @@ export default function LoginDesignerPage() {
             {currentSession ? (
               <div className="text-xs space-y-1">
                 <p><b>User ID:</b> {currentSession.userId}</p>
+                <p className={currentSession.userId === designerId ? "text-green-600 font-bold" : "text-red-600"}>
+                  {currentSession.userId === designerId ? "✓ ID Designer correct" : "✗ ID différent du Designer"}
+                </p>
                 <p><b>Email:</b> {currentSession.email}</p>
                 <p><b>Role:</b> {currentSession.role}</p>
                 <p><b>Has Metadata:</b> {currentSession.hasMetadata ? 'Oui' : 'Non'}</p>
@@ -123,25 +155,38 @@ export default function LoginDesignerPage() {
               <p className="font-semibold">Connexion réussie !</p>
               <p className="text-xs mt-1">Session ID: {sessionInfo.sessionId}</p>
               <p className="text-xs">Role défini: {sessionInfo.role}</p>
-              <p className="text-xs mt-2">Veuillez vérifier les informations de session ci-dessus pour confirmer que le rôle est correctement défini.</p>
+              <p className="text-xs mt-2">Redirection automatique vers le projet dans 2 secondes...</p>
             </div>
           )}
           
-          <Button 
-            className="w-full" 
-            onClick={handleLogin}
-            disabled={loading}
-          >
-            {loading ? "Connexion en cours..." : success ? "Reconnecter" : "Se connecter en tant que Designer"}
-          </Button>
-          
-          <Button 
-            className="w-full mt-2" 
-            variant="outline"
-            onClick={() => router.push("/projects/550e8400-e29b-41d4-a716-446655440020")}
-          >
-            Accéder au projet Brand Redesign
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button 
+              className="w-full" 
+              onClick={handleLogin}
+              disabled={loading}
+            >
+              {loading ? "Connexion en cours..." : (currentSession && currentSession.userId === designerId) ? "Reconnexion Designer" : "Se connecter en tant que Designer"}
+            </Button>
+            
+            {currentSession && (
+              <Button 
+                className="w-full" 
+                variant="outline"
+                onClick={handleLogout}
+                disabled={loading}
+              >
+                Déconnexion
+              </Button>
+            )}
+            
+            <Button 
+              className="w-full mt-2" 
+              variant={currentSession && currentSession.userId === designerId ? "default" : "outline"}
+              onClick={() => router.push("/projects/550e8400-e29b-41d4-a716-446655440020")}
+            >
+              Accéder au projet Brand Redesign
+            </Button>
+          </div>
           
           {success && (
             <div className="mt-2 text-xs text-muted-foreground">

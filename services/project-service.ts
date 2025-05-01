@@ -165,13 +165,12 @@ export async function addComment(
       .insert({
         deliverable_id: deliverableId,
         project_id: deliverable.project_id,
-        user_id: userId !== "system" ? userId : null,
+        user_id: userId,
         client_id: clientId,
         content,
         is_client: isClient,
         milestone_name: deliverable.project_steps.title,
-        version_name: deliverable.version_name,
-        is_system_message: userId === "system",
+        version_name: deliverable.version_name
       })
       .select()
 
@@ -268,7 +267,7 @@ export async function approveDeliverable(deliverableId: string, clientId: string
   }
 }
 
-export async function rejectDeliverable(deliverableId: string, clientId: string, feedback: string) {
+export async function rejectDeliverable(deliverableId: string, clientId: string, feedback: string, user_id: string) {
   const supabase = createServerSupabaseClient()
 
   try {
@@ -280,7 +279,6 @@ export async function rejectDeliverable(deliverableId: string, clientId: string,
     if (!feedback || feedback.trim() === "") {
       throw new Error("feedback is required");
     }
-    
     
     // Récupérer les informations du livrable pour le commentaire
     const { data: deliverable, error: deliverableError } = await supabase
@@ -318,7 +316,7 @@ export async function rejectDeliverable(deliverableId: string, clientId: string,
     const commentData: CommentData = {
       deliverable_id: deliverableId,
       project_id: deliverable.project_id,
-      user_id: clientId,
+      user_id: user_id,
       content: feedback,
       is_client: true,
       milestone_name: deliverable.project_steps.title || "Milestone",
@@ -328,6 +326,7 @@ export async function rejectDeliverable(deliverableId: string, clientId: string,
     // Si clientId existe et n'est pas vide, l'ajouter au commentaire
     if (clientId && clientId.trim() !== "") {
       commentData.client_id = clientId;
+      commentData.user_id = user_id;
     }
     
     const { error: commentError } = await supabase
