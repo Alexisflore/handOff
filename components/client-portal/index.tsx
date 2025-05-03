@@ -509,6 +509,7 @@ export function ClientPortal({
           isRefreshing={isRefreshing}
           currentUser={currentUser}
           toggleDeliverableSelector={toggleDeliverableSelector}
+          project={project}
         />
 
         {/* Corps principal - sidebar + contenu */}

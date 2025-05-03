@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ interface ClientHeaderProps {
   isRefreshing: boolean
   currentUser?: any
   toggleDeliverableSelector: () => void
+  project: any
 }
 
 export function ClientHeader({
@@ -24,11 +25,12 @@ export function ClientHeader({
   refreshProjectData,
   isRefreshing,
   currentUser,
-  toggleDeliverableSelector
+  toggleDeliverableSelector,
+  project
 }: ClientHeaderProps) {
   return (
     <header className="flex w-full border-b border-slate-200 h-[56px] shrink-0 sticky top-0 z-30 bg-white">
-      {/* Partie gauche - Client info */}
+      {/* Client logo section */}
       <div 
         className={`flex ${
           sidebarCollapsed ? "w-16 justify-center" : "w-64 items-center gap-3"
@@ -44,35 +46,44 @@ export function ClientHeader({
         </div>
       </div>
       
-      {/* Partie droite - Titre et contrôles */}
+      {/* Main header content */}
       <div className="flex-1 flex justify-between items-center px-4 overflow-hidden">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">
-            {activeDeliverable.title}
-          </h1>
+        {/* Project & deliverable breadcrumb */}
+        <div className="flex items-center gap-1">
+          <div className="flex items-center">
+            <span className="text-base font-medium text-slate-800 max-w-[200px] truncate">{project.title}</span>
+            <Badge variant="outline" className="ml-2 bg-blue-50/50 text-blue-700 border-blue-100 hover:bg-blue-50 text-xs">
+              {project.status === "in_progress" ? "In Progress" : project.status}
+            </Badge>
+          </div>
           
-          <Badge
-            variant="outline"
-            className={
-              activeDeliverable.status === "completed"
-                ? "bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors border-green-200"
-                : activeDeliverable.status === "current"
-                  ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 transition-colors border-amber-200" 
-                  : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition-colors border-slate-200"
-            }
-          >
-            {activeDeliverable.status === "completed" 
-              ? "Approved" 
-              : activeDeliverable.status === "current" 
-                ? "In Progress" 
-                : "Upcoming"}
-          </Badge>
+          <ChevronRight className="h-4 w-4 mx-1.5 text-slate-400 flex-shrink-0" />
+          
+          <div className="flex items-center">
+            <span className="text-base font-medium text-slate-800 max-w-[200px] truncate">{activeDeliverable.title}</span>
+            <Badge
+              variant="outline"
+              className={`ml-2 text-xs border-opacity-50 ${
+                activeDeliverable.status === "completed"
+                  ? "bg-green-50/50 text-green-700 border-green-100"
+                  : activeDeliverable.status === "current"
+                    ? "bg-amber-50/50 text-amber-700 border-amber-100" 
+                    : "bg-slate-50/50 text-slate-500 border-slate-100"
+              }`}
+            >
+              {activeDeliverable.status === "completed" 
+                ? "Approved" 
+                : activeDeliverable.status === "current" 
+                  ? "In Progress" 
+                  : "Upcoming"}
+            </Badge>
+          </div>
           
           <Button
             id="toggle-deliverables-button" 
             variant="ghost"
             size="sm"
-            className="ml-1 flex items-center gap-1 text-slate-600 hover:text-slate-800"
+            className="ml-2 flex items-center gap-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100/70 rounded-md px-2"
             onClick={() => {
               toggleDeliverableSelector();
               setTimeout(() => {
@@ -88,22 +99,23 @@ export function ClientHeader({
           </Button>
         </div>
         
+        {/* Action buttons */}
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-9 w-9 p-0"
+            className="h-8 w-8 p-0 rounded-full hover:bg-slate-100/70"
             onClick={refreshProjectData}
             disabled={isRefreshing}
             title="Actualiser"
           >
             {isRefreshing ? 
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             : 
-              <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-4 w-4 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             }

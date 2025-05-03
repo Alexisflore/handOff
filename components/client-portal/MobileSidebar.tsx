@@ -59,17 +59,7 @@ export function MobileSidebar({
             </Button>
           </div>
 
-          <div className="p-4">
-            <h2 className="text-base font-semibold mb-1">{project.title}</h2>
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
-                {project.status === "in_progress" ? "In Progress" : project.status}
-              </Badge>
-              <p className="text-xs text-muted-foreground">Project #{project.project_number}</p>
-            </div>
-          </div>
-
-          <nav className="mb-4 px-4">
+          <nav className="mb-4 px-4 pt-4">
             <h3 className="text-xs font-medium mb-3 text-muted-foreground uppercase tracking-wider">
               Navigation
             </h3>

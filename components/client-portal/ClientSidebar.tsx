@@ -44,30 +44,6 @@ export function ClientSidebar({
       } flex-col border-r bg-white md:flex hidden relative`}
     >
       <div className="flex h-full flex-col">
-        {/* Project info */}
-        <div className={`px-4 py-4 border-b border-slate-200 ${sidebarCollapsed ? "items-center justify-center" : ""} flex flex-col`}>
-          <h2 className={`text-base font-bold mb-1 truncate ${sidebarCollapsed ? "hidden" : "block"}`}>
-            {project.title}
-          </h2>
-          <div className={`flex items-center gap-2 mb-2 ${sidebarCollapsed ? "hidden" : "flex"}`}>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs">
-              {project.status === "in_progress" ? "In Progress" : project.status}
-            </Badge>
-            <p className="text-xs text-muted-foreground">Project #{project.project_number}</p>
-          </div>
-          <div
-            className={`flex justify-between text-xs text-muted-foreground ${sidebarCollapsed ? "hidden" : "flex"}`}
-          >
-            <span>
-              Started:{" "}
-              {new Date(project.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </span>
-            <span>
-              Due: {new Date(project.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </span>
-          </div>
-        </div>
-
         {/* Navigation */}
         <nav className="flex-1 pt-5 px-4 pb-4">
           <h3
