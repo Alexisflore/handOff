@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Sélecteur de Livrables</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .deliverable-selector {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .deliverable-selector.open {
+      max-height: 1000px;
+      overflow: visible;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 16px;
+    }
+    .button {
+      background-color: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+    .deliverable {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .deliverable:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .status-bar {
+      height: 4px;
+      width: 100%;
+    }
+    .completed {
+      background-color: #10b981;
+    }
+    .current {
+      background-color: #f59e0b;
+    }
+    .upcoming {
+      background-color: #9ca3af;
+    }
+    .content {
+      padding: 16px;
+    }
+    .title {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .description {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      min-height: 100px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Sélecteur de Livrables</h1>
+  
+  <div class="button" id="toggle-button">Tous les livrables</div>
+  
+  <div id="deliverable-selector" class="deliverable-selector">
+    <div class="grid">
+      <div class="deliverable" data-id="1" data-status="completed">
+        <div class="status-bar completed"></div>
+        <div class="content">
+          <div class="title">Logo Design</div>
+          <div class="description">Creation of brand logo with multiple variations</div>
+        </div>
+      </div>
+      
+      <div class="deliverable" data-id="2" data-status="current">
+        <div class="status-bar current"></div>
+        <div class="content">
+          <div class="title">Website Layout</div>
+          <div class="description">Homepage and product page wireframes</div>
+        </div>
+      </div>
+      
+      <div class="deliverable" data-id="3" data-status="upcoming">
+        <div class="status-bar upcoming"></div>
+        <div class="content">
+          <div class="title">Mobile App Design</div>
+          <div class="description">UI/UX design for mobile application</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="result">
+    <p>Logs: </p>
+    <ul id="log-list"></ul>
+  </div>
+
+  <script>
+    // Toggle button functionality
+    const toggleButton = document.getElementById('toggle-button');
+    const selector = document.getElementById('deliverable-selector');
+    const logList = document.getElementById('log-list');
+    
+    function addLog(message) {
+      const logItem = document.createElement('li');
+      logItem.textContent = message;
+      logList.appendChild(logItem);
+    }
+    
+    toggleButton.addEventListener('click', function() {
+      addLog("Toggle button clicked");
+      if (selector.classList.contains('open')) {
+        selector.classList.remove('open');
+      } else {
+        selector.classList.add('open');
+      }
+    });
+    
+    // Deliverable click events
+    const deliverables = document.querySelectorAll('.deliverable');
+    deliverables.forEach(deliverable => {
+      deliverable.addEventListener('click', function() {
+        const id = this.getAttribute('data-id');
+        const status = this.getAttribute('data-status');
+        const title = this.querySelector('.title').textContent;
+        
+        addLog(`Clicked on deliverable: ${id} - ${title} (${status})`);
+        
+        if (status !== 'upcoming') {
+          // Simulate loading the deliverable
+          addLog(`Loading deliverable: ${id}`);
+          selector.classList.remove('open');
+        }
+      });
+    });
+  </script>
+</body>
+</html> 

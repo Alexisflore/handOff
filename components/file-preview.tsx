@@ -33,9 +33,20 @@ export function FilePreview({ fileType, fileName, fileUrl }: FilePreviewProps) {
   const handlePrevPage = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1)
   }
+  
+  // Ajouter la navigation au clavier
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (fileType === "pdf") {
+      if (event.key === "ArrowRight" || event.key === "PageDown") {
+        handleNextPage()
+      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        handlePrevPage()
+      }
+    }
+  }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" tabIndex={0} onKeyDown={handleKeyDown}>
       <div className="flex items-center justify-between bg-slate-50 px-4 py-2 border-b">
         <div className="flex items-center gap-2">
           {fileType === "pdf" && (

@@ -30,6 +30,7 @@ interface EnhancedCommentThreadProps {
   currentMilestone: string
   currentVersion: string
   onSendComment: (content: string) => void
+  defaultFilter?: "milestone" | "all"
 }
 
 export function EnhancedCommentThread({
@@ -37,10 +38,11 @@ export function EnhancedCommentThread({
   currentMilestone,
   currentVersion,
   onSendComment,
+  defaultFilter = "milestone"
 }: EnhancedCommentThreadProps) {
   const [newComment, setNewComment] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [filter, setFilter] = useState<"milestone" | "all">("milestone")
+  const [filter, setFilter] = useState<"milestone" | "all">(defaultFilter)
 
   // Filter comments based on the selected filter
   const filteredComments =
@@ -74,7 +76,7 @@ export function EnhancedCommentThread({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full flex-1 overflow-hidden">
       <CardHeader className="border-b py-3 px-4 flex-shrink-0 bg-slate-50">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">Discussion</CardTitle>
@@ -104,7 +106,7 @@ export function EnhancedCommentThread({
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Scrollable message area that takes available space */}
         <div className="flex-1 overflow-y-auto">
-          <CardContent className="p-0 h-full">
+          <CardContent className="p-0">
             {sortedComments.length === 0 ? (
               <div className="flex h-full items-center justify-center p-4">
                 <div className="text-center">
