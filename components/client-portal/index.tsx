@@ -8,7 +8,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { useRouter } from "next/navigation"
 
 import { addComment, getProjectDetails } from "@/services/project-service"
-import { ProjectDashboard } from "@/components/project-dashboard"
+import { ProjectDashboard } from "@/components/project-stats/dashboard"
 import { ProjectHistory } from "@/components/project-history"
 import { ProjectFiles } from "@/components/project-files"
 
@@ -20,6 +20,7 @@ import { AddVersionModal } from "./AddVersionModal"
 import { MobileSidebar } from "./MobileSidebar"
 import { ActionFooter } from "./ActionFooter"
 import { ClientPortalProps, Version, CurrentUser, Deliverable, Comment } from "./types"
+import { TabType } from "@/app/projects/[id]/page"
 
 export function ClientPortal({
   project,
@@ -28,6 +29,7 @@ export function ClientPortal({
   freelancer,
   comments: initialComments,
   sharedFiles: initialSharedFiles,
+  initialActiveTab = "current"
 }: ClientPortalProps) {
   // Vérifier si les données essentielles sont disponibles
   if (!project || !deliverables || deliverables.length === 0) {
@@ -98,7 +100,7 @@ export function ClientPortal({
       ? currentDeliverableObj.versions[0].id
       : ""
   )
-  const [activeTab, setActiveTab] = useState("current")
+  const [activeTab, setActiveTab] = useState<TabType>(initialActiveTab as TabType)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isAddVersionModalOpen, setIsAddVersionModalOpen] = useState(false)
@@ -108,6 +110,42 @@ export function ClientPortal({
     // Toujours garder le sélecteur ouvert
     setIsDeliverableSelectorOpen(true);
   }, [activeTab]); // Se déclenche à chaque changement d'onglet
+
+  // Initialisation des onglets pour garantir l'affichage du contenu
+  useEffect(() => {
+    // Forcer l'affichage des onglets au chargement initial
+    setTimeout(() => {
+      // Force l'onglet courant à s'afficher correctement
+      const tabContents = document.querySelectorAll('[id^="radix-"][id$="-content-dashboard"]');
+      
+      tabContents.forEach(content => {
+        if (content instanceof HTMLElement) {
+          console.log("Initializing dashboard tab:", content.id);
+          content.removeAttribute('hidden');
+          content.style.display = activeTab === 'dashboard' ? 'block' : 'none';
+          content.style.visibility = 'visible';
+          
+          // Si c'est l'onglet actif, on s'assure qu'il est visible
+          if (activeTab === 'dashboard') {
+            // On vérifie le contenu
+            const isEmpty = content.innerHTML.trim() === '';
+            console.log("Dashboard tab is empty:", isEmpty);
+            
+            // Forcer un re-rendu si vide
+            if (isEmpty && content.querySelector('div')) {
+              // Forcer le re-rendu en modifiant le DOM
+              const container = content.querySelector('div');
+              if (container) {
+                const temp = container.innerHTML;
+                container.innerHTML = ''; 
+                setTimeout(() => { container.innerHTML = temp; }, 10);
+              }
+            }
+          }
+        }
+      });
+    }, 500);
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -389,7 +427,7 @@ export function ClientPortal({
     }
 
     // Forcer l'onglet "current"
-    setActiveTab("current");
+    setActiveTab("current" as TabType);
   }
 
   // Fonction pour gérer la sélection d'un livrable
@@ -434,7 +472,7 @@ export function ClientPortal({
     }
     
     // Forcer l'onglet "current"
-    setActiveTab("current");
+    setActiveTab("current" as TabType);
     
     // Maintain scroll position at top
     setTimeout(() => {
@@ -513,7 +551,7 @@ export function ClientPortal({
         />
 
         {/* Corps principal - sidebar + contenu */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden w-full">
           {/* Sidebar */}
           <ClientSidebar 
             project={project}
@@ -530,16 +568,35 @@ export function ClientPortal({
           />
 
           {/* Main Content */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <main className="flex flex-1 flex-col p-0 overflow-auto">
+          <div className="flex flex-1 flex-col overflow-hidden w-full">
+            <main className="flex flex-1 flex-col p-0 overflow-auto w-full">
               <Tabs
                 value={activeTab}
                 onValueChange={(value) => {
-                  setActiveTab(value)
+                  console.log("Changing tab to:", value);
+                  setActiveTab(value as TabType);
                   
-                  if (value === "current") {
-                    // Keep scroll position at top
-                    setTimeout(() => {
+                  // Force l'affichage de tous les contenus d'onglet, mais cache ceux qui ne sont pas actifs
+                  setTimeout(() => {
+                    const allTabContents = document.querySelectorAll('[id^="radix-"]');
+                    allTabContents.forEach(content => {
+                      if (content instanceof HTMLElement) {
+                        // Supprimer l'attribut hidden pour tous
+                        content.removeAttribute('hidden');
+                        
+                        // Pour les onglets non-actifs, on les masque avec CSS plutôt qu'avec l'attribut hidden
+                        const tabId = content.id.split('-').pop();
+                        if (tabId !== value) {
+                          content.style.display = 'none';
+                        } else {
+                          content.style.display = 'block';
+                          content.style.visibility = 'visible';
+                        }
+                      }
+                    });
+                    
+                    // Gère le scroll pour l'onglet "current"
+                    if (value === "current") {
                       const contentContainer = document.querySelector('[data-value="current"]');
                       if (contentContainer) {
                         contentContainer.scrollTo({
@@ -547,17 +604,28 @@ export function ClientPortal({
                           behavior: 'instant'
                         });
                       }
-                    }, 10);
-                  }
+                    }
+                  }, 50);
                 }}
                 className="w-full h-full flex flex-col overflow-hidden"
               >
-                <div className="overflow-auto flex-1 flex flex-col min-h-0 border-b border-slate-200">
-                  <TabsContent value="dashboard" className="flex-1 overflow-auto p-4">
-                    <ProjectDashboard projectId={project.id} />
+                <div className="overflow-auto flex-1 flex flex-col min-h-0 border-b border-slate-200 w-full">
+                  <TabsContent 
+                    value="dashboard" 
+                    className="flex-1 overflow-auto h-full w-full" 
+                    style={{
+                      display: "block", 
+                      width: "100%", 
+                      visibility: "visible"
+                    }}
+                    data-force-visible="true"
+                  >
+                    <div className="px-4 py-4 h-full w-full">
+                      <ProjectDashboard projectId={project.id} />
+                    </div>
                   </TabsContent>
 
-                  <TabsContent value="current" className="flex-1 flex flex-col overflow-auto flex-grow">
+                  <TabsContent value="current" className="flex-1 flex flex-col overflow-auto flex-grow w-full" style={{display: activeTab === "current" ? "flex" : "none", width: "100%"}}>
                     <div className="flex flex-col h-full justify-between space-y-4 px-4 pb-4">
                       {/* Section de sélection des livrables */}
                       <div className="flex flex-col space-y-4">
@@ -593,17 +661,21 @@ export function ClientPortal({
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="history" className="flex-1 overflow-auto p-4 h-full">
-                    <ProjectHistory milestones={deliverables} onViewVersion={handleVersionChange} comments={comments} />
+                  <TabsContent value="history" className="flex-1 overflow-auto flex-grow w-full" style={{display: activeTab === "history" ? "block" : "none", width: "100%"}}>
+                    <div className="px-4 py-4 h-full">
+                      <ProjectHistory milestones={deliverables} onViewVersion={handleVersionChange} comments={comments} />
+                    </div>
                   </TabsContent>
 
-                  <TabsContent value="my-files" className="flex-1 overflow-auto p-4 h-full">
-                    <ProjectFiles
-                      files={sharedFiles}
-                      projectId={project.id}
-                      clientId={client.id}
-                      onFileDeleted={refreshProjectData}
-                    />
+                  <TabsContent value="my-files" className="flex-1 overflow-auto flex-grow w-full" style={{display: activeTab === "my-files" ? "block" : "none", width: "100%"}}>
+                    <div className="px-4 py-4 h-full">
+                      <ProjectFiles
+                        files={sharedFiles}
+                        projectId={project.id}
+                        clientId={client.id}
+                        onFileDeleted={refreshProjectData}
+                      />
+                    </div>
                   </TabsContent>
                 </div>
               </Tabs>

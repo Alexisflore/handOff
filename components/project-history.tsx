@@ -59,10 +59,10 @@ export function ProjectHistory({ milestones, onViewVersion, comments }: HistoryP
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full">
       {/* Header with search and filters */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="space-y-3 w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
           <div>
             <h2 className="text-xl font-semibold">Project Timeline</h2>
             <p className="text-sm text-muted-foreground">View all versions and their feedback</p>

@@ -178,8 +178,8 @@ export function ProjectFiles({ files = [], projectId, clientId, onFileDeleted }:
   const hasActiveFilters = fileTypeFilter.length > 0 || uploadedByFilter.length > 0 || searchQuery.length > 0
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-3 w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
         <div>
           <h2 className="text-xl font-semibold">Files</h2>
           <p className="text-sm text-muted-foreground">Files shared between you and your designer</p>

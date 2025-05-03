@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CurrentUser } from "./types"
+import { TabType } from "@/app/projects/[id]/page"
 
 interface ClientSidebarProps {
   project: any
   client: any
   freelancer: any
-  activeTab: string
-  setActiveTab: (tab: string) => void
+  activeTab: TabType
+  setActiveTab: (tab: TabType) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
   approvedDeliverables: number

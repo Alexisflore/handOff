@@ -1,15 +1,17 @@
 "use client"
 
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
 import { BarChart, Clock, History, FileIcon, ChevronLeft, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { TabType } from "@/app/projects/[id]/page"
 
 interface MobileSidebarProps {
   isOpen: boolean
   onClose: () => void
-  activeTab: string
-  setActiveTab: (tab: string) => void
+  activeTab: TabType
+  setActiveTab: (tab: TabType) => void
   project: any
   client: any
   freelancer: any
@@ -31,7 +33,7 @@ export function MobileSidebar({
   handleLogout
 }: MobileSidebarProps) {
   
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: TabType) => {
     setActiveTab(tab)
     onClose()
   }

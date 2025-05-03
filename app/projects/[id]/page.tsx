@@ -1,19 +1,28 @@
 import ClientProjectPage from "./ClientProjectPage"
 import Link from "next/link"
 import { getProjectDetailsAction } from "@/app/actions"
+import { Metadata } from "next"
 
 // Désactiver le cache pour cette page
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function Page({ params }: { params: { id: string } }) {
+// Types d'onglets disponibles dans le portail client
+export type TabType = "dashboard" | "current" | "history" | "my-files";
+
+export default async function Page({ params, searchParams }: { 
+  params: { id: string },
+  searchParams: { tab?: TabType }
+}) {
   // Les params doivent être attendus en premier
   const resolvedParams = await params;
   const id = resolvedParams.id;
   
+  // Récupérer l'onglet actif depuis les paramètres d'URL ou utiliser "dashboard" par défaut
+  const activeTab = searchParams.tab || "dashboard";
+  
   // Vérifier si l'ID est valide
   if (!id || id === "undefined" || id === "[id]") {
-    // Au lieu de rediriger, afficher une page d'erreur
     return (
       <div className="flex h-screen w-full items-center justify-center bg-white">
         <div className="text-center p-8 max-w-md">
@@ -53,11 +62,16 @@ export default async function Page({ params }: { params: { id: string } }) {
   }
   
   // Passer toutes les données déjà chargées au composant client
-  return <ClientProjectPage projectData={projectData} />
+  // Inclure l'onglet actif comme prop
+  return (
+    <div className="w-full h-screen overflow-hidden">
+      <ClientProjectPage projectData={projectData} initialActiveTab={activeTab} />
+    </div>
+  )
 }
 
 // Générer les métadonnées de la page dynamiquement
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   try {
     // Les params doivent être attendus en premier
     const resolvedParams = await params;

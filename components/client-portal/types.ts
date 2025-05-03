@@ -1,3 +1,5 @@
+import { TabType } from "@/app/projects/[id]/page";
+
 export interface ClientPortalProps {
   project: any
   client: any
@@ -5,6 +7,7 @@ export interface ClientPortalProps {
   freelancer: any
   comments: any[]
   sharedFiles: any[]
+  initialActiveTab?: TabType
 }
 
 export interface Version {

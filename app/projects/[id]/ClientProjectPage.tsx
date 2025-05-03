@@ -4,6 +4,7 @@ import { ClientPortal } from "@/components/client-portal"
 import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { notFound } from "next/navigation"
+import { TabType } from "./page"
 
 // Type pour les données du projet
 type ProjectData = {
@@ -13,6 +14,12 @@ type ProjectData = {
   comments: any[]
   freelancer: any
   sharedFiles: any[]
+}
+
+// Props du composant ProjectPage
+interface ProjectPageProps {
+  projectData: any
+  initialActiveTab?: TabType
 }
 
 // Composant de chargement pour afficher pendant que les données sont récupérées
@@ -105,7 +112,7 @@ function adaptDataForClientPortal(data: any): ProjectData {
 }
 
 // Composant principal qui affiche les données du projet
-function ProjectPage({ projectData }: { projectData: any }) {
+function ProjectPage({ projectData, initialActiveTab = "dashboard" }: ProjectPageProps) {
   // Vérifier si les données ont été récupérées correctement
   if (!projectData || !projectData.project) {
     return notFound()
@@ -116,22 +123,25 @@ function ProjectPage({ projectData }: { projectData: any }) {
 
   // Passer les données récupérées au composant ClientPortal
   return (
-    <ClientPortal
-      project={adaptedData.project}
-      client={adaptedData.client}
-      milestones={adaptedData.deliverables}
-      freelancer={adaptedData.freelancer}
-      comments={adaptedData.comments}
-      sharedFiles={adaptedData.sharedFiles}
-    />
+    <div className="w-full h-full">
+      <ClientPortal
+        project={adaptedData.project}
+        client={adaptedData.client}
+        milestones={adaptedData.deliverables}
+        freelancer={adaptedData.freelancer}
+        comments={adaptedData.comments}
+        sharedFiles={adaptedData.sharedFiles}
+        initialActiveTab={initialActiveTab}
+      />
+    </div>
   )
 }
 
 // Exporter le composant de page avec Suspense pour gérer le chargement
-export default function ClientProjectPage({ projectData }: { projectData: any }) {
+export default function ClientProjectPage({ projectData, initialActiveTab = "dashboard" }: ProjectPageProps) {
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <ProjectPage projectData={projectData} />
+      <ProjectPage projectData={projectData} initialActiveTab={initialActiveTab} />
     </Suspense>
   )
 }
