@@ -137,10 +137,9 @@ export function useVersions() {
           console.log('Utilisation de l\'ID designer par défaut:', process.env.NEXT_PUBLIC_DESIGNER_ID);
           return process.env.NEXT_PUBLIC_DESIGNER_ID;
         }
-        
-        // 5. En dernier recours, utiliser un ID par défaut
-        console.log('Aucun ID trouvé, utilisation de l\'ID par défaut: 373f6a99-745f-4475-a446-b0936e27d8fe');
-        return '373f6a99-745f-4475-a446-b0936e27d8fe'; // ID par défaut qui existe dans la base
+
+        // Si aucun ID utilisateur n'est trouvé, retourner null
+        return null;
       };
       
       const userId = await getUserId();

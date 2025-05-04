@@ -9,10 +9,10 @@ alwaysApply: true
 
 ### Composants UI
 
-- **Tous les composants UI doivent se trouver dans le dossier `ui`**
-  - Pour chaque nouveau composant d'interface, créez-le dans le dossier `ui`
-  - Réutilisez les composants existants du dossier `ui` quand c'est possible
-  - Ne créez JAMAIS de composants UI en dehors du dossier `ui`
+- **Tous les composants UI doivent se trouver dans le dossier `components/ui`**
+  - Pour chaque nouveau composant d'interface, créez-le dans le dossier `components/ui`
+  - Réutilisez les composants existants du dossier `components/ui` quand c'est possible
+  - Ne créez JAMAIS de composants UI en dehors du dossier `components/ui`
 
 ### Hooks et actions
 

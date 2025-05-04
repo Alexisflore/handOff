@@ -49,12 +49,7 @@ export function ProjectStats({ stats }: { stats: ProjectStats }) {
   }
 
   return (
-    <div className="w-full max-h-[calc(100vh-6rem)] overflow-y-auto pb-8">
-      <div className="px-4 py-4 border-b sticky top-0 bg-background z-10 w-full">
-        <h2 className="text-xl font-semibold">Project Statistics</h2>
-        <p className="text-sm text-muted-foreground">Track the progress of your project</p>
-      </div>
-
+    <div className="w-full max-h-[calc(100vh-6rem)] overflow-y-auto">
       <div className="p-4 grid gap-8 w-full">
         {/* Overview Cards */}
         <section className="w-full">

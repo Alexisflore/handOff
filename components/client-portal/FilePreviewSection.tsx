@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilePreview } from "@/components/file-preview"
-import { CommentThread } from "@/components/ui/CommentThread"
+import { CommentThread } from "@/components/steps-comment/CommentThread"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Version, Comment } from "./types"
 import { AddButton } from "@/components/ui/add-button"
@@ -131,12 +131,27 @@ export function FilePreviewSection({
     },
     content: c.content,
     timestamp: new Date(c.created_at).toLocaleString(),
-    milestoneId: currentStepId,
+    milestoneId: currentStepId,  // L'ID de l'étape actuelle
     milestoneName: c.deliverable_name || "Current Deliverable",
-    versionId: c.deliverable_id,
-    versionName: c.version_name || activeVersion?.version_name || "Version 1",
+    versionId: c.deliverable_id,  // ID du livrable auquel appartient le commentaire
+    versionName: c.version_name || "Version inconnue",
     isClient: c.is_client,
   })) as ThreadComment[]
+
+  // Débogage des commentaires
+  useEffect(() => {
+    console.log("[FilePreviewSection DEBUG] Commentaires fournis au thread:", {
+      total: commentsForThread.length,
+      currentStepId,
+      currentVersion,
+      commentaires: commentsForThread.map(c => ({
+        id: c.id, 
+        milestoneId: c.milestoneId,
+        versionId: c.versionId,
+        versionName: c.versionName
+      }))
+    });
+  }, [commentsForThread, currentStepId, currentVersion]);
 
   // Fonction pour basculer l'affichage des commentaires
   const toggleComments = () => {
@@ -150,6 +165,7 @@ export function FilePreviewSection({
   
   // Fonction pour sélectionner une version
   const handleVersionSelect = (versionId: string) => {
+    console.log("[FilePreviewSection] Changement de version:", versionId);
     onVersionChange(versionId)
     setShowVersionDropdown(false)
   }
@@ -428,7 +444,7 @@ export function FilePreviewSection({
             currentMilestone={currentStepId}
             currentVersion={currentVersion}
             onSendComment={onSendComment}
-            defaultFilter="milestone"
+            defaultFilter="deliverable"
           />
         </div>
       )}

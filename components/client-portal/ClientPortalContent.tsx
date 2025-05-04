@@ -2,7 +2,7 @@ import React from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ProjectDashboard } from "@/components/project-stats/dashboard";
 import { ProjectHistory } from "@/components/project-history";
-import { ProjectFiles } from "@/components/project-files";
+import { ProjectFiles } from "@/components/client-files/project-files";
 import { StepSelector } from "./StepSelector";
 import { FilePreviewSection } from "./FilePreviewSection";
 import { ActionFooter } from "./ActionFooter";

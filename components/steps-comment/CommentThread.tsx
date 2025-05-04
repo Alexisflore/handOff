@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { Send, ChevronDown, FilterIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
@@ -30,7 +30,7 @@ interface CommentThreadProps {
   currentMilestone: string
   currentVersion: string
   onSendComment: (content: string) => Promise<void>
-  defaultFilter?: "milestone" | "all"
+  defaultFilter?: "milestone" | "deliverable"
 }
 
 export function CommentThread({
@@ -43,18 +43,69 @@ export function CommentThread({
   const [newComment, setNewComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [filter, setFilter] = useState<"milestone" | "all">(defaultFilter)
+  const [filter, setFilter] = useState<"milestone" | "deliverable">(defaultFilter)
 
-  // Filter comments based on the selected filter
-  const filteredComments =
-    filter === "all" ? [...allComments] : allComments.filter((comment) => comment.milestoneId === currentMilestone)
+  // Débogage des props reçues
+  useEffect(() => {
+    console.log("[CommentThread DEBUG] Props reçues:", {
+      totalComments: allComments.length,
+      currentMilestone,
+      currentVersion,
+      defaultFilter,
+      filter
+    });
+
+    // Afficher les IDs de tous les commentaires et leurs milestoneId et versionId
+    console.log("[CommentThread DEBUG] Liste de TOUS les commentaires disponibles:", 
+      allComments.map(c => ({
+        id: c.id,
+        milestoneId: c.milestoneId,
+        versionId: c.versionId,
+        content: c.content.substring(0, 20) + (c.content.length > 20 ? '...' : '')
+      }))
+    );
+  }, [allComments, currentMilestone, currentVersion, defaultFilter, filter]);
+
+  // Reset to top of messages when version changes
+  useEffect(() => {
+    console.log("[CommentThread] Version changed:", currentVersion);
+    
+    if (filter === "deliverable") {
+      // Scroll to top when changing to a different deliverable's comments
+      const messagesContainer = messagesEndRef.current?.parentElement;
+      if (messagesContainer) {
+        messagesContainer.scrollTop = 0;
+      }
+    }
+  }, [currentVersion, filter]);
+
+  // Recalculate filtered comments when currentVersion changes
+  const filteredComments = useMemo(() => {
+    if (filter === "milestone") {
+      // En mode "Toute l'étape", on affiche tous les commentaires du step actuel, tous livrables confondus
+      console.log("[CommentThread] Affichage de TOUS les commentaires du step:", currentMilestone);
+      const stepComments = allComments.filter((comment) => comment.milestoneId === currentMilestone);
+      console.log("[CommentThread] Nombre de commentaires dans cette étape:", stepComments.length);
+      return stepComments;
+    } else {
+      // En mode "Ce livrable", on n'affiche que les commentaires du livrable actuel
+      console.log("[CommentThread] Affichage des commentaires du livrable spécifique:", currentVersion);
+      const deliverableComments = allComments.filter(
+        (comment) => comment.milestoneId === currentMilestone && comment.versionId === currentVersion
+      );
+      console.log("[CommentThread] Nombre de commentaires pour ce livrable:", deliverableComments.length);
+      return deliverableComments;
+    }
+  }, [filter, allComments, currentMilestone, currentVersion]);
 
   // Sort comments by timestamp (oldest first)
-  const sortedComments = filteredComments.sort((a, b) => {
-    const dateA = new Date(a.timestamp).getTime()
-    const dateB = new Date(b.timestamp).getTime()
-    return dateA - dateB
-  })
+  const sortedComments = useMemo(() => {
+    return [...filteredComments].sort((a, b) => {
+      const dateA = new Date(a.timestamp).getTime();
+      const dateB = new Date(b.timestamp).getTime();
+      return dateA - dateB;
+    });
+  }, [filteredComments]);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -97,7 +148,7 @@ export function CommentThread({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs px-2">
               <FilterIcon className="h-3 w-3" />
-              <span>{filter === "milestone" ? "This Milestone" : "All Project"}</span>
+              <span>{filter === "milestone" ? "Toute l'étape" : "Ce livrable"}</span>
               <ChevronDown className="h-3 w-3 ml-1 opacity-70" />
             </Button>
           </DropdownMenuTrigger>
@@ -106,13 +157,13 @@ export function CommentThread({
               className={`text-xs ${filter === "milestone" ? "font-medium" : ""}`}
               onClick={() => setFilter("milestone")}
             >
-              This Milestone
+              Toute l'étape
             </DropdownMenuItem>
             <DropdownMenuItem 
-              className={`text-xs ${filter === "all" ? "font-medium" : ""}`}
-              onClick={() => setFilter("all")}
+              className={`text-xs ${filter === "deliverable" ? "font-medium" : ""}`}
+              onClick={() => setFilter("deliverable")}
             >
-              All Project
+              Ce livrable
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -144,9 +195,9 @@ export function CommentThread({
                   <div className="flex flex-col">
                     <div className={`flex items-center gap-1.5 ${comment.isClient ? "justify-end" : ""} mb-1`}>
                       <span className="text-xs font-medium">{comment.author.name}</span>
-                      {comment.milestoneId !== currentMilestone && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0 bg-slate-50 text-slate-700">
-                          {comment.milestoneName}
+                      {filter === "milestone" && comment.versionId !== currentVersion && (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 bg-slate-50 text-slate-700 hover:bg-slate-100 cursor-default">
+                          {comment.versionName}
                         </Badge>
                       )}
                     </div>

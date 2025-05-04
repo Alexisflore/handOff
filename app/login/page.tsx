@@ -42,7 +42,7 @@ export default function LoginPage() {
       setError(null)
       
       // Connexion normale avec email/mot de passe
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -50,6 +50,20 @@ export default function LoginPage() {
       if (error) {
         setError(error.message)
         return
+      }
+      
+      // Après connexion réussie, mettre à jour les métadonnées utilisateur
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { 
+          full_name: "Client Example",
+          name: "Client"
+        }
+      });
+      
+      if (updateError) {
+        console.error("Erreur lors de la mise à jour du nom:", updateError);
+      } else {
+        console.log("Métadonnées nom mises à jour avec succès");
       }
       
       // Rediriger vers la page demandée ou la page d'accueil

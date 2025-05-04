@@ -35,14 +35,13 @@ export function useComments(initialComments: Comment[]) {
           users: {
             full_name: isClient 
               ? client.name 
-              : (currentUser?.full_name || freelancer?.users?.full_name || "John Doe"),
+              : (currentUser?.full_name),
             avatar_url: isClient 
               ? client.logo_url 
               : (currentUser?.avatar_url || freelancer?.users?.avatar_url)
           },
           is_client: isClient
         };
-        
         setComments((prev) => [...prev, commentWithUserInfo]);
       }
     } catch (error) {

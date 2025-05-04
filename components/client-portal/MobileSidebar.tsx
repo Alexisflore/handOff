@@ -4,8 +4,8 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { BarChart, Clock, History, FileIcon, ChevronLeft, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { TabType } from "@/app/projects/[id]/page"
+import { CurrentUser } from "./types"
 
 interface MobileSidebarProps {
   isOpen: boolean
@@ -18,6 +18,7 @@ interface MobileSidebarProps {
   approvedDeliverables: number
   totalDeliverables: number
   handleLogout: () => Promise<void>
+  currentUser: CurrentUser | null
 }
 
 export function MobileSidebar({
@@ -27,10 +28,8 @@ export function MobileSidebar({
   setActiveTab,
   project,
   client,
-  freelancer,
-  approvedDeliverables,
-  totalDeliverables,
-  handleLogout
+  handleLogout,
+  currentUser
 }: MobileSidebarProps) {
   
   const handleTabChange = (tab: TabType) => {
@@ -110,52 +109,26 @@ export function MobileSidebar({
             </div>
           </nav>
 
-          <div className="px-4 mb-4">
-            <div className="flex items-center text-sm mb-2">
-              <h3 className="font-medium">Deliverables</h3>
-            </div>
-            <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-              <div className="flex justify-between">
-                <span>
-                  {approvedDeliverables} of {totalDeliverables} approved
-                </span>
-                <span>
-                  {Math.round(
-                    (new Date(project.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
-                  )}{" "}
-                  days left
-                </span>
-              </div>
-            </div>
-          </div>
-
+          {/* Connected User information */}
           <div className="mt-auto p-4 border-t">
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage
-                  src={freelancer?.users?.avatar_url || "/placeholder.svg"}
-                  alt={freelancer?.users?.full_name}
-                />
-                <AvatarFallback className="bg-teal-100 text-teal-700">{freelancer?.initials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-sm font-medium">
-                  {freelancer?.users?.full_name} • {freelancer?.company}
-                </p>
-                <p className="text-xs text-muted-foreground">{freelancer?.role}</p>
+            {currentUser && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage
+                    src={currentUser.avatar_url || "/placeholder.svg"}
+                    alt={currentUser.full_name || "Utilisateur"}
+                  />
+                  <AvatarFallback className="bg-teal-100 text-teal-700">
+                    {currentUser.full_name ? currentUser.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">
+                    {currentUser.full_name || (currentUser.isDesigner ? "Designer" : "Client")}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center mt-2">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                Powered by
-                <img
-                  src="/placeholder.svg?height=16&width=16&text=H"
-                  alt="Handoff"
-                  className="h-4 w-4 inline-block"
-                />
-                <span className="font-medium">Handoff</span>
-              </p>
-            </div>
+            )}
           </div>
         </div>
       </div>

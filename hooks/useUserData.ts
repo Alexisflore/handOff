@@ -10,6 +10,7 @@ export function useUserData() {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
+        console.log("🔍 useUserData: Starting user data fetch");
         const debugData: {[key: string]: any} = {
           logs: []
         };
@@ -25,18 +26,97 @@ export function useUserData() {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         debugData.hasSession = !!session;
+        console.log("🔍 useUserData: Has session?", !!session);
         
         if (error) {
+          console.error("🔍 useUserData: Session error", error);
           debugData.sessionError = error.message;
           setDebugInfo(debugData);
           return;
         }
         
         if (session && session.user) {
+          console.log("🔍 useUserData: Session user found", session.user.id);
           debugData.userId = session.user.id;
           debugData.userEmail = session.user.email;
           debugData.userMetadata = session.user.user_metadata;
           debugData.rawSession = JSON.stringify(session, null, 2);
+          
+          // Fetch user data from public users table using auth user ID
+          console.log("🔍 useUserData: Fetching from public users table with auth_user_id =", session.user.id);
+          
+          // For debugging - log all users in the table first
+          const { data: allUsers, error: allUsersError } = await supabase
+            .from('users')
+            .select('*');
+            
+          console.log("🔍 useUserData: All users in public table:", allUsers);
+          debugData.allUsers = allUsers;
+          
+          if (allUsersError) {
+            console.error("🔍 useUserData: Error fetching all users", allUsersError);
+            debugData.allUsersError = allUsersError.message;
+          }
+          
+          // First try with auth_user_id
+          let userData = null;
+          let userError = null;
+          
+          try {
+            const result = await supabase
+              .from('users')
+              .select('full_name, avatar_url')
+              .eq('auth_user_id', session.user.id)
+              .single();
+              
+            userData = result.data;
+            userError = result.error;
+            
+            if (userError || !userData) {
+              console.log("🔍 useUserData: First attempt with auth_user_id failed, trying with id");
+              
+              // Try with 'id' column as fallback
+              const secondResult = await supabase
+                .from('users')
+                .select('full_name, avatar_url')
+                .eq('id', session.user.id)
+                .single();
+                
+              if (!secondResult.error && secondResult.data) {
+                userData = secondResult.data;
+                userError = null;
+                console.log("🔍 useUserData: Found user with id column");
+              } else {
+                console.log("🔍 useUserData: Second attempt with id failed");
+                
+                // If both queries failed, check if we can find the user by email
+                if (session.user.email) {
+                  console.log("🔍 useUserData: Trying to find user by email");
+                  const emailResult = await supabase
+                    .from('users')
+                    .select('full_name, avatar_url')
+                    .eq('email', session.user.email)
+                    .single();
+                    
+                  if (!emailResult.error && emailResult.data) {
+                    userData = emailResult.data;
+                    userError = null;
+                    console.log("🔍 useUserData: Found user with email match");
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("🔍 useUserData: Error during user data queries", e);
+          }
+            
+          debugData.publicUserData = userData;
+          console.log("🔍 useUserData: Final public user data result:", userData);
+          
+          if (userError) {
+            console.error("🔍 useUserData: Public user fetch error", userError);
+            debugData.publicUserError = userError.message;
+          }
           
           try {
             // Recherche du rôle dans différents endroits possibles
@@ -93,25 +173,56 @@ export function useUserData() {
               }
             }
             
-            setCurrentUser({
+            // Prioritize full_name from the public users table if available
+            const fullName = userData?.full_name || 
+                            session.user.user_metadata?.full_name || 
+                            session.user.user_metadata?.name || 
+                            session.user.email?.split('@')[0] || 
+                            'Utilisateur';
+            
+            // Prioritize avatar_url from the public users table if available
+            const avatarUrl = userData?.avatar_url || session.user.user_metadata?.avatar_url;
+            
+            const userObject = {
               id: session.user.id,
               email: session.user.email,
               role: roleFromMetadata || roleFromAppMetadata || session.user.role || 'unknown',
-              isDesigner: finalIsDesigner
+              isDesigner: finalIsDesigner,
+              full_name: fullName,
+              avatar_url: avatarUrl
+            };
+            
+            console.log("🔍 useUserData: Setting currentUser to", userObject);
+            setCurrentUser(userObject);
+            
+            // Log pour débogage
+            console.log("DEBUG User Metadata:", {
+              rawMetadata: session.user.user_metadata,
+              publicUserData: userData,
+              full_name: session.user.user_metadata?.full_name,
+              name: session.user.user_metadata?.name,
+              email: session.user.email,
+              fallbackName: session.user.email?.split('@')[0],
+              finalFullName: fullName,
+              avatarUrl: avatarUrl
             });
           } catch (error: any) {
+            console.error("🔍 useUserData: Error in user data processing", error);
             debugData.parseError = error.message;
           }
+        } else {
+          console.warn("🔍 useUserData: No session user found");
         }
         
         setDebugInfo(debugData);
       } catch (error: any) {
+        console.error("🔍 useUserData: Global error", error);
         setDebugInfo({ globalError: error.message });
       }
     }
     
-    fetchCurrentUser()
-  }, [])
+    fetchCurrentUser();
+  }, []);
 
   return { currentUser, debugInfo, showDebug, setShowDebug };
 } 

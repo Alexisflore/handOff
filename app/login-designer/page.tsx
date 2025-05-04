@@ -44,43 +44,57 @@ export default function LoginDesignerPage() {
     }
   }
 
-  async function handleLogin() {
+  async function handleDesignerLogin() {
+    setLoading(true)
+    setError(null)
+    
     try {
-      setLoading(true)
-      setError(null)
-      
-      // Appeler une API de connexion avec l'ID du designer
+      // Fetch via API route
       const response = await fetch("/api/auth/designer-login", {
         method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          designerId: designerId
-        })
+        body: JSON.stringify({})
       })
       
       const data = await response.json()
-      
-      if (!response.ok) {
-        console.error("Erreur de connexion:", data)
-        setError(data.error || `Erreur ${response.status}: ${response.statusText}`)
-        return
-      }
-      
-      setSuccess(true)
       setSessionInfo(data)
       
-      // Vérifier la session mise à jour
-      await checkCurrentSession();
-      
-      // Rediriger vers le projet après 2 secondes
-      setTimeout(() => {
-        router.push("/projects");
-      }, 2000);
-    } catch (err) {
-      console.error("Erreur:", err)
-      setError(`Une erreur s'est produite: ${err instanceof Error ? err.message : String(err)}`)
+      if (data.success) {
+        setSuccess(true)
+        
+        // Après connexion réussie, mettre à jour les métadonnées utilisateur avec un nom complet
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        
+        // Ajouter un full_name dans les métadonnées
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { 
+            full_name: "John Doe - Designer",
+            name: "John Doe"
+          }
+        });
+        
+        if (updateError) {
+          console.error("Erreur lors de la mise à jour du nom:", updateError);
+        } else {
+          console.log("Métadonnées nom mises à jour avec succès");
+          // Vérifier la mise à jour
+          await checkCurrentSession();
+        }
+        
+        // Rediriger après un court délai
+        setTimeout(() => {
+          router.push('/projects/b068931e-26fe-4237-a979-8e5d4ab7608a')
+        }, 2000)
+      } else {
+        setError(data.error || "Une erreur est survenue lors de la connexion")
+      }
+    } catch (err: any) {
+      setError(err.message || "Une erreur est survenue lors de la connexion")
     } finally {
       setLoading(false)
     }
@@ -162,7 +176,7 @@ export default function LoginDesignerPage() {
           <div className="flex flex-col gap-2">
             <Button 
               className="w-full" 
-              onClick={handleLogin}
+              onClick={handleDesignerLogin}
               disabled={loading}
             >
               {loading ? "Connexion en cours..." : (currentSession && currentSession.userId === designerId) ? "Reconnexion Designer" : "Se connecter en tant que Designer"}

@@ -34,13 +34,14 @@ export async function POST(request: NextRequest) {
     // Journaliser les données reçues pour le débogage
     console.log('Données de version reçues:', JSON.stringify(versionData, null, 2));
     
-    // ID par défaut à utiliser si aucun ID utilisateur n'est fourni
-    const DEFAULT_USER_ID = '373f6a99-745f-4475-a446-b0936e27d8fe'; // ID d'un utilisateur qui existe
     
     // S'assurer que user_id est présent
     if (!versionData.user_id) {
-      console.log('⚠️ Aucun user_id fourni, utilisation de l\'ID par défaut:', DEFAULT_USER_ID);
-      versionData.user_id = DEFAULT_USER_ID;
+        console.error('Aucun user_id fourni');
+        return NextResponse.json(
+            { error: 'Aucun user_id fourni' },
+            { status: 400 }
+        );
     } else {
       console.log('✅ user_id fourni:', versionData.user_id);
     }

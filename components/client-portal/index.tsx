@@ -384,6 +384,7 @@ function ClientPortalImplementation({
           totalDeliverables={totalDeliverables}
           freelancer={freelancer}
           handleLogout={handleLogout}
+          currentUser={currentUser}
         />
         
         <div className="flex flex-1 flex-col h-screen bg-white overflow-hidden">

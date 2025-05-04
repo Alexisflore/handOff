@@ -179,7 +179,7 @@ async function debugVersionCreation() {
       file_type: 'image/jpeg',
       project_id: selectedProject.id,
       deliverable_id: selectedStep ? selectedStep.id : null,
-      user_id: '373f6a99-745f-4475-a446-b0936e27d8fe' // ID utilisateur par défaut
+      user_id: user_id
     };
     
     console.log('\n📄 Données de la version:');
