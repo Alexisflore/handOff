@@ -2,6 +2,4 @@
 
 import { ClientPortal as ClientPortalImplementation } from "./client-portal/index"
 
-export function ClientPortal(props: any) {
-  return <ClientPortalImplementation {...props} />
-}
+export { ClientPortal } from "./client-portal/index"

@@ -19,12 +19,27 @@ export function useDeliverables(
     const currentDeliverableObj = deliverables.find((d) => d.status === "current") || deliverables[0] || null;
     
     if (currentDeliverableObj) {
-      setCurrentMilestone(currentDeliverableObj.id || "");
+      // Prioritiser l'utilisation de l'ID de l'étape (step_id) au lieu de l'ID du livrable
+      if (currentDeliverableObj.step_id) {
+        // Vérifier si l'étape existe dans les projectSteps
+        const relatedStep = projectSteps.find(s => s.id === currentDeliverableObj.step_id);
+        if (relatedStep) {
+          console.log("🔴 Initialisation - Utilisation de l'ID d'ÉTAPE:", relatedStep.id);
+          setCurrentMilestone(relatedStep.id);
+        } else {
+          console.log("🔴 Initialisation - Étape non trouvée, utilisation de l'ID du LIVRABLE:", currentDeliverableObj.id);
+          setCurrentMilestone(currentDeliverableObj.id);
+        }
+      } else {
+        console.log("🔴 Initialisation - Pas de step_id, utilisation de l'ID du LIVRABLE:", currentDeliverableObj.id);
+        setCurrentMilestone(currentDeliverableObj.id || "");
+      }
+      
       if (currentDeliverableObj.versions && currentDeliverableObj.versions.length > 0) {
         setCurrentVersion(currentDeliverableObj.versions[0].id);
       }
     }
-  }, [deliverables]);
+  }, [deliverables, projectSteps]);
 
   // Trouver le livrable actif
   const activeDeliverable = useMemo(() => {
@@ -102,7 +117,7 @@ export function useDeliverables(
 
   // Fonction pour gérer la sélection d'une étape
   const handleMilestoneClick = (stepId: string, showLatest: boolean = false) => {
-    console.log("handleMilestoneClick called with stepId:", stepId, "showLatest:", showLatest);
+    console.log("🔴 CRITICAL in handleMilestoneClick - called with stepId:", stepId);
     
     // Force showLatest to true for consistent behavior
     showLatest = true;
@@ -117,13 +132,17 @@ export function useDeliverables(
         status: step.status
       });
       
-      // Ne pas traiter les étapes à venir
-      if (step.status === "upcoming") {
-        return;
-      }
+      // Ne pas traiter les étapes à venir - SUPPRESSION DE CETTE CONDITION
+      // Nous permettons maintenant aux designers d'accéder aux étapes "upcoming"
       
-      // Sélectionner l'étape
+      // CRUCIALE - Cette ligne met à jour l'état currentMilestone avec l'ID de l'ÉTAPE
       setCurrentMilestone(step.id);
+      console.log("🔴 CRITICAL - currentMilestone mis à jour avec l'ID de l'ÉTAPE:", step.id);
+      
+      // Forcer une mise à jour synchrone du DOM
+      queueMicrotask(() => {
+        console.log("🔴 CRITICAL - Après queueMicrotask, currentMilestone est:", currentMilestone);
+      });
       
       // Chercher les livrables associés à cette étape
       const relatedDeliverables = deliverables.filter(d => 
@@ -196,13 +215,28 @@ export function useDeliverables(
         return;
       }
       
-      // Ne pas traiter les livrables à venir
-      if (deliverable.status === "upcoming") {
-        return;
-      }
+      // Ne pas traiter les livrables à venir - SUPPRESSION DE CETTE CONDITION
+      // Nous permettons maintenant aux designers d'accéder aux livrables "upcoming"
       
-      // Sélectionner le livrable
-      setCurrentMilestone(deliverable.id);
+      // Si le livrable a un step_id, utiliser cet ID d'étape à la place de l'ID du livrable
+      // Ceci est crucial pour garantir que currentMilestone est toujours un ID d'étape
+      if (deliverable.step_id) {
+        // Trouver l'étape correspondante
+        const relatedStep = projectSteps.find(s => s.id === deliverable.step_id);
+        if (relatedStep) {
+          // Utiliser l'ID de l'étape pour la cohérence
+          setCurrentMilestone(relatedStep.id);
+          console.log("🔴 CRITICAL - currentMilestone mis à jour avec l'ID de l'ÉTAPE associée:", relatedStep.id);
+        } else {
+          // Si aucune étape associée n'est trouvée, utiliser l'ID du livrable comme fallback
+          setCurrentMilestone(deliverable.id);
+          console.log("🔴 CRITICAL - currentMilestone mis à jour avec l'ID du LIVRABLE (fallback):", deliverable.id);
+        }
+      } else {
+        // Si pas de step_id, utiliser l'ID du livrable (comportement actuel)
+        setCurrentMilestone(deliverable.id);
+        console.log("🔴 CRITICAL - currentMilestone mis à jour avec l'ID du LIVRABLE:", deliverable.id);
+      }
       
       // S'il a des versions, sélectionner la dernière ou celle marquée comme dernière
       if (deliverable.versions && deliverable.versions.length > 0) {

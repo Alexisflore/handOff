@@ -1,0 +1,52 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Règles de développement pour le projet Next.js
+
+## Structure du code
+
+### Composants UI
+
+- **Tous les composants UI doivent se trouver dans le dossier `ui`**
+  - Pour chaque nouveau composant d'interface, créez-le dans le dossier `ui`
+  - Réutilisez les composants existants du dossier `ui` quand c'est possible
+  - Ne créez JAMAIS de composants UI en dehors du dossier `ui`
+
+### Hooks et actions
+
+- **Tous les hooks et fichiers d'actions doivent se trouver dans le dossier `hooks`**
+  - Toute la logique d'action doit être définie dans des fichiers à l'intérieur du dossier `hooks` at the root directory.
+  - Les composants doivent importer les hooks/actions depuis le dossier `hooks` at the root directory
+  - Ne définissez JAMAIS de hooks ou d'actions dans des fichiers qui ne sont pas dans le dossier `hooks` at the root directory.
+
+## Bonnes pratiques
+
+- Séparez clairement la logique (hooks) de la présentation (ui)
+- Maintenez un niveau élevé de réutilisabilité pour les composants UI
+- Assurez-vous que chaque action est bien isolée dans son propre fichier dans le dossier `hooks`
+- Documentez les hooks et composants UI complexes pour faciliter leur réutilisation
+
+## Importation correcte
+
+Exemple d'importation correcte :
+```tsx
+// Importation d'un composant UI
+import { Button } from "@/ui/button";
+
+// Importation d'une action/hook
+import { useUserData } from "@/app/hooks/useUserData";
+```
+
+## À éviter
+
+```tsx
+// ❌ NE PAS définir de composants UI dans des fichiers de pages ou de fonctionnalités
+// app/page.tsx
+const Button = () => { /* ... */ }  // Incorrect
+
+// ❌ NE PAS définir d'actions ou de hooks dans des composants UI
+// ui/form.tsx
+const useFormSubmit = () => { /* ... */ }  // Incorrect
+```

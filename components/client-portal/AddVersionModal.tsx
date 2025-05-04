@@ -25,10 +25,21 @@ export function AddVersionModal({ isOpen, onClose, onSubmit }: AddVersionModalPr
   
   // Debug log when modal open state changes
   useEffect(() => {
-    console.log("AddVersionModal isOpen changed to:", isOpen);
+    console.log("🔴 AddVersionModal isOpen changed to:", isOpen);
     
     // Réinitialiser l'état du formulaire à chaque ouverture
     if (isOpen) {
+      // DEBUG: Afficher le stepId stocké
+      try {
+        const stepId = localStorage.getItem('addingVersionForStepId');
+        const sessionStepId = sessionStorage.getItem('lastSelectedStepId');
+        console.log("🔍 AddVersionModal - Step IDs actuels:");
+        console.log("  - localStorage:", stepId);
+        console.log("  - sessionStorage:", sessionStepId);
+      } catch (e) {
+        console.error("Erreur lors de la lecture depuis storage:", e);
+      }
+      
       setSelectedFile(null);
       setIsSubmitting(false);
       
@@ -37,11 +48,35 @@ export function AddVersionModal({ isOpen, onClose, onSubmit }: AddVersionModalPr
         fileInputRef.current.value = '';
       }
       
-      // Forcer l'affichage du modal via le DOM
+      // CORRECTION CRITIQUE: Forcer l'affichage du modal via DOM avec plusieurs approches
+      console.log("⚠️ Tentative d'affichage du modal...");
+      
+      // Approche 1: via la référence React
       if (modalRef.current) {
         modalRef.current.style.display = 'flex';
-        console.log("Modal affiché via useEffect");
+        console.log("✅ Modal affiché via ref React");
+      } else {
+        console.log("❌ modalRef.current est null");
       }
+      
+      // Approche 2: via getElementById (avec délai)
+      setTimeout(() => {
+        // Vérifier que le modal existe dans le DOM
+        const modalExists = !!document.getElementById('version-modal-container');
+        console.log("Modal existe dans le DOM:", modalExists ? "OUI" : "NON");
+        
+        // Forcer l'affichage via DOM
+        const modalElement = document.getElementById('version-modal-container');
+        if (modalElement) {
+          modalElement.style.display = 'flex';
+          console.log("✅ Modal affiché via getElementById");
+          
+          // S'assurer que le body a le bon style
+          document.body.style.overflow = 'hidden';
+        } else {
+          console.log("❌ getElementById('version-modal-container') est null");
+        }
+      }, 100);
       
       // Ajouter un gestionnaire pour la touche Escape
       const handleEscape = (e: KeyboardEvent) => {
@@ -99,6 +134,14 @@ export function AddVersionModal({ isOpen, onClose, onSubmit }: AddVersionModalPr
     try {
       setIsSubmitting(true)
       console.log("Début de la soumission avec fichier:", selectedFile.name);
+      
+      // DEBUG: Vérifier une dernière fois le stepId avant soumission
+      try {
+        const stepId = localStorage.getItem('addingVersionForStepId');
+        console.log("🔴 VERIFICATION CRUCIALE - Step ID avant soumission (localStorage):", stepId);
+      } catch (e) {
+        console.error("Erreur lors de la lecture depuis localStorage:", e);
+      }
       
       // Télécharger le fichier au moment de la soumission
       toast({

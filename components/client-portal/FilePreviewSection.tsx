@@ -1,15 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, Download, MessageSquare, Plus } from "lucide-react"
+import { ChevronDown, Download, MessageSquare, Plus, FileX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FilePreview } from "@/components/file-preview"
-import { EnhancedCommentThread } from "@/components/enhanced-comment-thread"
+import { CommentThread } from "@/components/ui/CommentThread"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Version, Comment } from "./types"
 import { AddButton } from "@/components/ui/add-button"
+import { BreadcrumbButton } from "@/components/ui/breadcrumb-button"
+import { DropdownIndicator } from "@/components/ui/dropdown-indicator"
 
 interface FilePreviewSectionProps {
   activeVersion: Version | null
@@ -119,7 +121,7 @@ export function FilePreviewSection({
     }
   }, [allVersions, currentStepId]); // Dépend uniquement des versions disponibles et de l'étape actuelle
 
-  // Adapter les commentaires pour le composant EnhancedCommentThread
+  // Adapter les commentaires pour le composant CommentThread
   const commentsForThread = comments.map((c) => ({
     id: c.id,
     author: {
@@ -179,228 +181,249 @@ export function FilePreviewSection({
       {/* Left column - File preview */}
       <div className={`flex-1 ${showComments ? "lg:w-2/3" : "lg:w-full"} flex flex-col h-full`}>
         <Card className={`flex flex-col shadow-sm hover:shadow transition-shadow duration-200 border-slate-200 overflow-auto h-full ${isLoading ? 'animate-pulse' : ''}`}>
-          <CardHeader className="flex-row items-center justify-between space-y-0 py-3 px-4 border-b flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-sm font-medium">Preview</CardTitle>
-              {/* Version selector dropdown */}
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 flex items-center gap-1.5 text-sm"
-                  onClick={toggleVersionDropdown}
-                >
-                  {activeVersion && (
-                    <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 mr-1.5 px-1.5 py-0" variant="secondary">
-                      {getFormattedVersionName(activeVersion, allVersions).number}
-                    </Badge>
-                  )}
-                  <span className="max-w-[180px] truncate overflow-hidden whitespace-nowrap">
-                    {activeVersion ? getFormattedVersionName(activeVersion, allVersions).name : "Version 1"}
-                  </span>
-                  {activeVersion?.id === [...allVersions].sort((a, b) => 
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                  )[0]?.id && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 flex-shrink-0 ml-1.5">Latest</Badge>
-                  )}
-                  <span className="text-xs text-gray-500 mx-1 flex-shrink-0">
-                    {activeVersion ? new Date(activeVersion.created_at).toLocaleDateString() : ""}
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 ml-1 flex-shrink-0" />
-                </Button>
-                
-                {/* Dropdown menu for versions */}
-                {activeVersion && (
-                  <div 
-                    className={`absolute left-0 top-full mt-1 z-50 w-88 ${showVersionDropdown ? 'block' : 'hidden'}`}
-                  >
-                    <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1 max-h-60 overflow-y-auto">
-                      {/* Liste complète des versions sans séparation spéciale pour la version actuelle */}
-                      {[...allVersions]
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .map((version, index) => (
-                          <div 
-                            key={version.id}
-                            className={`px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
-                              version.id === activeVersion.id ? 'bg-blue-50 font-medium' : ''
-                            }`}
-                            onClick={() => handleVersionSelect(version.id)}
-                          >
-                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 px-1.5 py-0" variant="secondary">
-                              {getFormattedVersionName(version, allVersions).number}
-                            </Badge>
-                            <span className="truncate overflow-hidden max-w-[180px]">
-                              {getFormattedVersionName(version, allVersions).name}
-                              {version.deliverable_title && version.deliverable_title.trim() !== "" && 
-                                <span className="text-xs ml-2 text-gray-600">({version.deliverable_title})</span>
-                              }
-                            </span>
-                            {version.id === [...allVersions].sort((a, b) => 
-                              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                            )[0]?.id && (
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-700">Latest</Badge>
-                            )}
-                            <span className="text-xs text-gray-500 ml-auto">
-                              {new Date(version.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        ))
-                      }
-                      
-                      {/* Bouton d'ajout de version dans le dropdown (visible seulement pour les designers) */}
-                      {isDesigner && (
-                        <div className="px-3 py-2 border-t border-gray-100 mt-1">
-                          <AddButton 
-                            label="Ajouter une version" 
-                            style="compact"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setShowVersionDropdown(false);
-                              
-                              if (typeof onAddNewVersion === 'function') {
-                                console.log("Adding version for step ID:", currentStepId);
-                                onAddNewVersion(currentStepId);
-                                
-                                // Forcer l'ouverture du modal
-                                setTimeout(() => {
-                                  const modalElement = document.getElementById('version-modal-container');
-                                  if (modalElement) {
-                                    modalElement.style.display = 'flex';
-                                    console.log("Modal forcé depuis le menu déroulant");
-                                    document.body.style.overflow = 'hidden';
-                                  } else {
-                                    // Si le modal principal n'est pas trouvé, utiliser le modal de secours
-                                    const backupModal = document.getElementById('backup-version-modal');
-                                    if (backupModal) {
-                                      backupModal.style.display = 'flex';
-                                      console.log("Modal de secours utilisé depuis le menu déroulant");
-                                      document.body.style.overflow = 'hidden';
-                                    } else {
-                                      console.error("Aucun modal disponible");
-                                    }
-                                  }
-                                }, 100);
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+          {allVersions.length === 0 ? (
+            // Interface simplifiée pour les étapes sans livrables
+            <div className="flex flex-col items-center justify-center p-8 h-full text-center">
+              <div className="rounded-full bg-slate-100 p-4 mb-4">
+                <FileX className="h-8 w-8 text-slate-500" />
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Bouton "Add a new version" visible uniquement pour les designers */}
+              <h3 className="text-xl font-medium text-slate-800 mb-3">Étape sans livrable</h3>
+              <p className="text-sm text-slate-500 max-w-md mb-6">
+                {isDesigner 
+                  ? "Cette étape n'a pas encore de livrable. Vous pouvez en ajouter un maintenant." 
+                  : "Cette étape est en attente de livrables. Ils seront disponibles prochainement."}
+              </p>
               {isDesigner && (
-                <AddButton
-                  label="Ajouter une version"
-                  tooltipText="Ajouter une version"
-                  style="icon-only"
+                <AddButton 
+                  label="Ajouter un livrable"
+                  onClick={() => onAddNewVersion(currentStepId)}
+                  style="normal"
                   color="blue"
-                  iconSize={12}
-                  className="h-8 w-8 flex items-center justify-center"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log("Add new version button clicked for step ID:", currentStepId);
-                    
-                    // Approche double: appeler la fonction et manipuler directement le DOM
-                    if (typeof onAddNewVersion === 'function') {
-                      onAddNewVersion(currentStepId);
-                      
-                      // Forcer l'affichage du modal via le DOM en cas d'échec de l'approche React
-                      setTimeout(() => {
-                        const modalElement = document.getElementById('version-modal-container');
-                        if (modalElement) {
-                          modalElement.style.display = 'flex';
-                          console.log("Modal forcé directement depuis le bouton");
-                          document.body.style.overflow = 'hidden';
-                        } else {
-                          // Si le modal principal n'est pas trouvé, utiliser le modal de secours
-                          const backupModal = document.getElementById('backup-version-modal');
-                          if (backupModal) {
-                            backupModal.style.display = 'flex';
-                            console.log("Modal de secours utilisé");
-                            document.body.style.overflow = 'hidden';
-                          } else {
-                            console.error("Aucun modal disponible");
-                          }
-                        }
-                      }, 100);
-                    } else {
-                      console.error("onAddNewVersion is not a function");
-                    }
-                  }}
+                  className="w-full max-w-xs"
                 />
               )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 w-8 p-0"
-                    onClick={() => {
-                      if (activeVersion?.file_url) {
-                        window.open(activeVersion.file_url, '_blank');
-                      }
-                    }}
-                    disabled={!activeVersion?.file_url}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span className="sr-only">Download</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Télécharger le fichier</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={toggleComments}>
-                    <MessageSquare className="h-4 w-4" />
-                    <span className="sr-only">Toggle Comments</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{showComments ? "Masquer les commentaires" : "Afficher les commentaires"}</TooltipContent>
-              </Tooltip>
             </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full w-full bg-slate-50">
-                <div className="text-slate-500 text-center p-8">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-                  <p className="mt-4">Chargement du livrable...</p>
+          ) : (
+            // Interface standard avec sélecteur de version et prévisualisation
+            <>
+              <CardHeader className="flex-row items-center justify-between space-y-0 py-3 px-4 border-b flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  {/* Version selector dropdown */}
+                  <div className="relative">
+                    <BreadcrumbButton
+                      label={activeVersion ? getFormattedVersionName(activeVersion, allVersions).name : "Version 1"}
+                      showDropdownIndicator
+                      isDropdownOpen={showVersionDropdown}
+                      onClick={toggleVersionDropdown}
+                      badge={{
+                        text: activeVersion ? getFormattedVersionName(activeVersion, allVersions).number.toString() : "1",
+                        variant: "outline",
+                        status: "default"
+                      }}
+                      className={activeVersion && activeVersion.id === [...allVersions].sort((a, b) => 
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                      )[0]?.id ? "after:content-['Latest'] after:ml-2 after:text-xs after:font-medium after:text-blue-700 after:bg-blue-50 after:px-1.5 after:py-0.5 after:rounded-md" : ""}
+                    />
+                    
+                    {/* Dropdown menu for versions */}
+                    {activeVersion && (
+                      <div 
+                        className={`absolute left-0 top-full mt-1 z-50 w-88 ${showVersionDropdown ? 'block' : 'hidden'}`}
+                      >
+                        <div className="bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-60 overflow-y-auto">
+                          <div className="px-2 py-1.5 mb-1 border-b border-slate-100">
+                            <h3 className="text-sm font-medium text-slate-700">Versions disponibles</h3>
+                          </div>
+                          {/* Liste complète des versions sans séparation spéciale pour la version actuelle */}
+                          {[...allVersions]
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .map((version, index) => (
+                              <div 
+                                key={version.id}
+                                className={`px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
+                                  version.id === activeVersion.id ? 'bg-blue-50 font-medium' : ''
+                                }`}
+                                onClick={() => handleVersionSelect(version.id)}
+                              >
+                                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 px-1.5 py-0" variant="secondary">
+                                  {getFormattedVersionName(version, allVersions).number}
+                                </Badge>
+                                <span className="truncate overflow-hidden max-w-[180px]">
+                                  {getFormattedVersionName(version, allVersions).name}
+                                  {version.deliverable_title && version.deliverable_title.trim() !== "" && 
+                                    <span className="text-xs ml-2 text-gray-600">({version.deliverable_title})</span>
+                                  }
+                                </span>
+                                {version.id === [...allVersions].sort((a, b) => 
+                                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                                )[0]?.id && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">Latest</Badge>
+                                )}
+                                <span className="text-xs text-gray-500 ml-auto">
+                                  {new Date(version.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            ))
+                          }
+                          
+                          {/* Bouton d'ajout de version dans le dropdown (visible seulement pour les designers) */}
+                          {isDesigner && (
+                            <div className="px-3 py-2 border-t border-gray-100 mt-1">
+                              <AddButton 
+                                label="Ajouter une version" 
+                                style="compact"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setShowVersionDropdown(false);
+                                  
+                                  if (typeof onAddNewVersion === 'function') {
+                                    // Log explicitly before calling to verify the ID is correct
+                                    console.log("🔴 CRITICAL - Adding version from dropdown with step ID:", currentStepId);
+                                    
+                                    // Sauvegarder également l'ID dans sessionStorage pour assurer la persistance
+                                    try {
+                                      sessionStorage.setItem('lastSelectedStepId', currentStepId);
+                                      console.log("Step ID sauvegardé dans sessionStorage:", currentStepId);
+                                    } catch (e) {
+                                      console.error("Erreur de sauvegarde dans sessionStorage:", e);
+                                    }
+                                    
+                                    onAddNewVersion(currentStepId);
+                                    
+                                    // Forcer l'ouverture du modal
+                                    setTimeout(() => {
+                                      const modalElement = document.getElementById('version-modal-container');
+                                      if (modalElement) {
+                                        modalElement.style.display = 'flex';
+                                        console.log("Modal forcé depuis le menu déroulant");
+                                        document.body.style.overflow = 'hidden';
+                                      } else {
+                                        // Si le modal principal n'est pas trouvé, utiliser le modal de secours
+                                        const backupModal = document.getElementById('backup-version-modal');
+                                        if (backupModal) {
+                                          backupModal.style.display = 'flex';
+                                          console.log("Modal de secours utilisé depuis le menu déroulant");
+                                          document.body.style.overflow = 'hidden';
+                                        } else {
+                                          console.error("Aucun modal disponible");
+                                        }
+                                      }
+                                    }, 100);
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : activeVersion ? (
-              <>
-                <FilePreview
-                  fileType={(activeVersion.file_type === "pdf" ? "pdf" : "image") as "image" | "pdf" | "other"}
-                  fileName={
-                    activeVersion.deliverable_title && activeVersion.deliverable_title.trim() !== "" 
-                    ? activeVersion.deliverable_title
-                    : activeVersion.version_name ||
-                      `Deliverable_${activeVersion.version_name}.${activeVersion.file_type === "pdf" ? "pdf" : "png"}`
-                  }
-                  fileUrl={
-                    activeVersion.file_url ||
-                    "/placeholder.svg?height=600&width=450&text=Preview+Not+Available"
-                  }
-                />
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full w-full bg-slate-50">
-                <p className="text-slate-500 text-center p-8">Aucun aperçu disponible</p>
-              </div>
-            )}
-          </CardContent>
+                <div className="flex items-center gap-2">
+                  {/* Bouton "Add a new version" visible uniquement pour les designers */}
+                  {isDesigner && (
+                    <AddButton
+                      label="Ajouter une version"
+                      tooltipText="Ajouter une version"
+                      style="icon-only"
+                      color="blue"
+                      iconSize={12}
+                      className="h-8 w-8 flex items-center justify-center"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Added CRITICAL LOG
+                        console.log("🔴 CRITICAL - Add new version button clicked with step ID:", currentStepId);
+                        
+                        // Sauvegarder également l'ID dans sessionStorage pour assurer la persistance
+                        try {
+                          sessionStorage.setItem('lastSelectedStepId', currentStepId);
+                          console.log("Step ID sauvegardé dans sessionStorage:", currentStepId);
+                        } catch (e) {
+                          console.error("Erreur de sauvegarde dans sessionStorage:", e);
+                        }
+                        
+                        // Approche double: appeler la fonction et manipuler directement le DOM
+                        if (typeof onAddNewVersion === 'function') {
+                          onAddNewVersion(currentStepId);
+                          
+                          // Forcer l'affichage du modal via le DOM en cas d'échec de l'approche React
+                          setTimeout(() => {
+                            const modalElement = document.getElementById('version-modal-container');
+                            if (modalElement) {
+                              modalElement.style.display = 'flex';
+                              console.log("Modal forcé directement depuis le bouton");
+                              document.body.style.overflow = 'hidden';
+                            } else {
+                              // Si le modal principal n'est pas trouvé, utiliser le modal de secours
+                              const backupModal = document.getElementById('backup-version-modal');
+                              if (backupModal) {
+                                backupModal.style.display = 'flex';
+                                console.log("Modal de secours utilisé");
+                                document.body.style.overflow = 'hidden';
+                              } else {
+                                console.error("Aucun modal disponible");
+                              }
+                            }
+                          }, 100);
+                        } else {
+                          console.error("onAddNewVersion is not a function");
+                        }
+                      }}
+                    />
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          if (activeVersion?.file_url) {
+                            window.open(activeVersion.file_url, '_blank');
+                          }
+                        }}
+                        disabled={!activeVersion?.file_url}
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="sr-only">Download</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Télécharger le fichier</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={toggleComments}>
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="sr-only">Toggle Comments</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{showComments ? "Masquer les commentaires" : "Afficher les commentaires"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 overflow-auto">
+                {activeVersion && activeVersion.file_url ? (
+                  <FilePreview
+                    fileName={activeVersion.file_name || "preview"}
+                    fileType={(activeVersion.file_type === "pdf" ? "pdf" : "image") as "image" | "pdf" | "other"}
+                    fileUrl={activeVersion.file_url}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center p-8 h-full">
+                    <p className="text-slate-500">Sélectionnez une version pour afficher l'aperçu</p>
+                  </div>
+                )}
+              </CardContent>
+            </>
+          )}
         </Card>
       </div>
 
       {/* Right column - Comments */}
       {showComments && (
         <div className="lg:w-1/3 flex flex-col h-full overflow-hidden">
-          <EnhancedCommentThread 
+          <CommentThread 
             allComments={commentsForThread} 
             currentMilestone={currentStepId}
             currentVersion={currentVersion}

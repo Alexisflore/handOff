@@ -91,9 +91,15 @@ export function ClientPortalContent({
                   project={project}
                   isOpen={isDeliverableSelectorOpen}
                   onAddStep={currentUser?.isDesigner ? handleAddDeliverable : undefined}
+                  isDesigner={currentUser?.isDesigner || false}
                 />
                 
                 {/* File Preview Section */}
+                {/* Debug: Log the milestone ID being passed to ensure it's correct */}
+                {(() => { 
+                  console.log("🔴 CRITICAL in ClientPortalContent - Rendering FilePreviewSection with currentStepId:", currentMilestone);
+                  return null; 
+                })()}
                 <FilePreviewSection 
                   activeVersion={activeVersion}
                   currentStepId={currentMilestone}

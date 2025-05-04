@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
 import { TabsList, TabsTrigger, Tabs } from "@/components/ui/tabs"
+import { notFound } from "next/navigation"
 
 import { ClientHeader } from "./ClientHeader"
 import { ClientSidebar } from "./ClientSidebar"
@@ -14,6 +15,7 @@ import { AddVersionModal } from "./AddVersionModal"
 import { ClientPortalContent } from "./ClientPortalContent"
 import { ClientPortalProps, Comment } from "./types"
 import { TabType } from "@/app/projects/[id]/page"
+import { AddStepModal } from "./AddStepModal"
 
 // Hooks
 import { useProjectSteps } from "../../hooks/useProjectSteps"
@@ -23,7 +25,102 @@ import { useProjectData } from "../../hooks/useProjectData"
 import { useDeliverables } from "../../hooks/useDeliverables"
 import { useVersions } from "../../hooks/useVersions"
 
+// Type pour les données du projet
+type ProjectData = {
+  project: any
+  client: any
+  deliverables: any[]
+  comments: any[]
+  freelancer: any
+  sharedFiles: any[]
+}
+
+// Fonction pour adapter les données au format attendu par ClientPortal
+function adaptDataForClientPortal(data: any): ProjectData {
+  if (!data) {
+    return {
+      project: {},
+      client: {},
+      deliverables: [],
+      comments: [],
+      freelancer: {},
+      sharedFiles: []
+    };
+  }
+  
+  // Si les livrables sont directement dans la structure, les adapter
+  let deliverables = data.deliverables || [];
+  
+  // Transformer chaque livrable si nécessaire
+  deliverables = deliverables.map((deliverable: any) => {
+    // Vérifier si le livrable a déjà une structure avec versions
+    if (deliverable.versions) {
+      return deliverable;
+    }
+    
+    // Sinon, adapter le livrable pour avoir le format attendu
+    return {
+      ...deliverable,
+      // Ajouter le livrable lui-même comme version (pour la compatibilité)
+      versions: [
+        {
+          id: deliverable.id,
+          version_name: deliverable.version_name || "Version 1",
+          is_latest: deliverable.is_latest || true,
+          created_at: deliverable.created_at,
+          file_type: deliverable.file_type,
+          file_name: deliverable.file_name,
+          file_url: deliverable.file_url,
+          status: deliverable.status,
+          step_id: deliverable.step_id,
+          description: deliverable.description
+        }
+      ]
+    };
+  });
+  
+  return {
+    project: data.project,
+    client: data.client,
+    deliverables: deliverables,
+    comments: data.comments || [],
+    freelancer: data.freelancer,
+    sharedFiles: data.sharedFiles || []
+  };
+}
+
+// Props pour le composant external ClientPortal
+interface ExternalClientPortalProps {
+  projectData: any;
+  initialActiveTab?: TabType;
+}
+
+// Composant ClientPortal utilisé par la page
 export function ClientPortal({
+  projectData,
+  initialActiveTab = "dashboard"
+}: ExternalClientPortalProps) {
+  // Vérifier si les données ont été récupérées correctement
+  if (!projectData || !projectData.project) {
+    return notFound();
+  }
+  
+  // Adapter les données au format attendu
+  const adaptedData = adaptDataForClientPortal(projectData);
+  
+  return <ClientPortalImplementation 
+    project={adaptedData.project}
+    client={adaptedData.client}
+    milestones={adaptedData.deliverables}
+    freelancer={adaptedData.freelancer}
+    comments={adaptedData.comments}
+    sharedFiles={adaptedData.sharedFiles}
+    initialActiveTab={initialActiveTab}
+  />;
+}
+
+// Implémentation interne du portail client
+function ClientPortalImplementation({
   project,
   client,
   milestones: deliverables,
@@ -55,9 +152,10 @@ export function ClientPortal({
 
   // Utiliser les hooks personnalisés
   const { currentUser } = useUserData();
-  const projectSteps = useProjectSteps(project, deliverables);
+  const { projectSteps, addProjectStep } = useProjectSteps(project, deliverables);
   const { comments, setComments, handleSendComment } = useComments(initialComments);
   const { sharedFiles, isRefreshing, refreshProjectData } = useProjectData(project.id, initialSharedFiles);
+  const { toast } = useToast();
 
   // Hook pour les livrables et étapes
   const {
@@ -92,6 +190,7 @@ export function ClientPortal({
   // État UI
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isAddStepModalOpen, setIsAddStepModalOpen] = useState(false);
   const router = useRouter();
 
   // Calcul du nombre de livrables approuvés
@@ -101,7 +200,31 @@ export function ClientPortal({
 
   // Wrapper pour handleAddNewVersion qui utilise les données contextuelles
   const handleAddNewVersion = (stepId?: string) => {
+    // Log CRITIQUE pour le debugging
+    console.log("🔴🔴 CRITICAL in ClientPortal - handleAddNewVersion called with:");
+    console.log("   - stepId from FilePreviewSection:", stepId);
+    console.log("   - currentMilestone in state:", currentMilestone);
+    console.log("   - currentMilestone est-il correct?", currentMilestone === stepId ? "OUI ✅" : "NON ❌");
+    
+    // Le stepId doit TOUJOURS être passé tel quel à handleAddNewVersionBase
     handleAddNewVersionBase(stepId, currentMilestone, deliverables);
+    
+    // SOLUTION DE SECOURS: forcer également l'ouverture du modal directement ici
+    setTimeout(() => {
+      // Garantir que le modal est bien ouvert en définissant directement l'état
+      console.log("⚠️ Forçage de l'ouverture du modal depuis ClientPortal");
+      setIsAddVersionModalOpen(true);
+      
+      // Manipuler directement le DOM pour garantir l'affichage
+      const modalElement = document.getElementById('version-modal-container');
+      if (modalElement) {
+        modalElement.style.display = 'flex';
+        console.log("✅ Modal forcé directement depuis ClientPortal");
+        document.body.style.overflow = 'hidden';
+      } else {
+        console.log("❌ Modal non trouvé dans le DOM depuis ClientPortal");
+      }
+    }, 150); // Délai légèrement plus long que dans le hook useVersions
   };
 
   // Wrapper pour submitNewVersion qui utilise les données contextuelles
@@ -148,10 +271,24 @@ export function ClientPortal({
 
   // Fonction pour ajouter un nouveau livrable
   const handleAddDeliverable = () => {
-    useToast().toast({
-      title: "Ajout de livrable",
-      description: "Fonctionnalité en cours de développement."
-    });
+    setIsAddStepModalOpen(true);
+  };
+
+  // Fonction pour gérer la soumission du nouveau step
+  const handleAddStepSubmit = async (data: { stepName: string; stepDescription: string }) => {
+    try {
+      // Appel à la fonction du hook pour ajouter l'étape
+      await addProjectStep(data);
+      // Fermer le modal
+      setIsAddStepModalOpen(false);
+      // Rafraîchir les données du projet si nécessaire
+      refreshProjectData();
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de l'étape:", error);
+      return Promise.reject(error);
+    }
   };
 
   // Fonction pour fermer le sélecteur de livrables (garde la même fonction que toggle pour compatibilité)
@@ -174,7 +311,7 @@ export function ClientPortal({
       return Promise.resolve();
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
-      useToast().toast({
+      toast({
         title: "Erreur",
         description: "Impossible de se déconnecter. Veuillez réessayer.",
         variant: "destructive"
@@ -220,39 +357,49 @@ export function ClientPortal({
   }, [activeTab]);
 
   return (
-    <TooltipProvider>
-      <div className="flex h-dvh w-full flex-col overflow-hidden bg-white">
-        {/* Header - Passer l'étape active au lieu du livrable actif */}
-        <ClientHeader 
-          sidebarCollapsed={sidebarCollapsed}
+    <div className="flex h-screen w-full overflow-hidden bg-white">
+      <TooltipProvider>
+        <ClientSidebar 
           client={client}
-          activeDeliverable={activeDeliverable}
-          activeStep={activeStep}
-          refreshProjectData={refreshProjectData}
-          isRefreshing={isRefreshing}
-          currentUser={currentUser}
-          toggleDeliverableSelector={toggleDeliverableSelector}
           project={project}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
+          approvedDeliverables={approvedDeliverables}
+          totalDeliverables={totalDeliverables}
+          freelancer={freelancer}
+          handleLogout={handleLogout}
+          currentUser={currentUser}
         />
-
-        {/* Corps principal - sidebar + contenu */}
-        <div className="flex flex-1 overflow-hidden w-full">
-          {/* Sidebar */}
-          <ClientSidebar 
-            project={project}
+        
+        <MobileSidebar 
+          client={client}
+          project={project}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isOpen={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
+          approvedDeliverables={approvedDeliverables}
+          totalDeliverables={totalDeliverables}
+          freelancer={freelancer}
+          handleLogout={handleLogout}
+        />
+        
+        <div className="flex flex-1 flex-col h-screen bg-white overflow-hidden">
+          <ClientHeader 
+            sidebarCollapsed={sidebarCollapsed} 
             client={client}
-            freelancer={freelancer}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            sidebarCollapsed={sidebarCollapsed}
-            setSidebarCollapsed={setSidebarCollapsed}
-            approvedDeliverables={approvedDeliverables}
-            totalDeliverables={totalDeliverables}
-            handleLogout={handleLogout}
+            activeDeliverable={activeDeliverable}
+            activeStep={activeStep}
+            refreshProjectData={refreshProjectData}
+            isRefreshing={isRefreshing}
             currentUser={currentUser}
+            toggleDeliverableSelector={toggleDeliverableSelector}
+            project={project}
+            activeTab={activeTab}
           />
 
-          {/* Main Content */}
           <div className="flex flex-1 flex-col overflow-hidden w-full">
             <ClientPortalContent
               activeTab={activeTab}
@@ -277,20 +424,6 @@ export function ClientPortal({
               sharedFiles={sharedFiles}
             />
           </div>
-          
-          {/* Mobile sidebar drawer */}
-          <MobileSidebar 
-            isOpen={mobileSidebarOpen}
-            onClose={() => setMobileSidebarOpen(false)}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            project={project}
-            client={client}
-            freelancer={freelancer}
-            approvedDeliverables={approvedDeliverables}
-            totalDeliverables={totalDeliverables}
-            handleLogout={handleLogout}
-          />
         </div>
         
         {/* Modal pour ajouter une nouvelle version */}
@@ -352,7 +485,14 @@ export function ClientPortal({
             </div>
           </div>
         </div>
-      </div>
-    </TooltipProvider>
+        
+        {/* Modal pour ajouter une nouvelle étape */}
+        <AddStepModal
+          isOpen={isAddStepModalOpen}
+          onClose={() => setIsAddStepModalOpen(false)}
+          onSubmit={handleAddStepSubmit}
+        />
+      </TooltipProvider>
+    </div>
   );
 } 

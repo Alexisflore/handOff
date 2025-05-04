@@ -1,4 +1,4 @@
-import ClientProjectPage from "./ClientProjectPage"
+import { ClientPortal } from "@/components/client-portal"
 import Link from "next/link"
 import { getProjectDetailsAction } from "@/app/actions"
 import { Metadata } from "next"
@@ -66,7 +66,7 @@ export default async function Page({ params, searchParams }: {
   // Inclure l'onglet actif comme prop
   return (
     <div className="w-full h-screen overflow-hidden">
-      <ClientProjectPage projectData={projectData} initialActiveTab={activeTab} />
+      <ClientPortal projectData={projectData} initialActiveTab={activeTab} />
     </div>
   )
 }

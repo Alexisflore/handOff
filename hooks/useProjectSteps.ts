@@ -6,6 +6,71 @@ export function useProjectSteps(project: any, deliverables: any[]) {
   const [projectSteps, setProjectSteps] = useState<any[]>([]);
   const { toast } = useToast();
 
+  // Fonction pour ajouter une nouvelle étape au projet
+  const addProjectStep = async (data: { stepName: string; stepDescription: string }) => {
+    try {
+      // Vérifier que les variables d'environnement sont définies
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error("Variables d'environnement Supabase non définies");
+      }
+      
+      const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+      
+      if (!project.id) {
+        throw new Error("ID du projet non défini");
+      }
+      
+      // Calculer le order_index pour la nouvelle étape (nombre d'étapes existantes + 1)
+      const order_index = projectSteps.length > 0 ? projectSteps.length : 0;
+      console.log("Nouvel order_index calculé:", order_index);
+      
+      // Créer la nouvelle étape
+      const { data: newStep, error } = await supabase
+        .from('project_steps')
+        .insert([
+          {
+            project_id: project.id,
+            title: data.stepName,
+            description: data.stepDescription,
+            status: 'upcoming', // Par défaut, la nouvelle étape est à venir
+            order_index: order_index // Ajouter l'index d'ordre calculé
+          }
+        ])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Erreur lors de l'ajout de l'étape:", error);
+        throw new Error(error.message);
+      }
+      
+      // Mettre à jour l'état local avec la nouvelle étape
+      if (newStep) {
+        setProjectSteps((prev) => [...prev, newStep]);
+        
+        // Notification de succès
+        toast({
+          title: "Étape ajoutée",
+          description: `L'étape "${data.stepName}" a été ajoutée avec succès.`
+        });
+        
+        return newStep;
+      }
+    } catch (error) {
+      console.error("Exception lors de l'ajout de l'étape:", error);
+      // Afficher une notification d'erreur
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'ajouter l'étape au projet.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (project?.id) {
       // Fonction pour récupérer les étapes du projet
@@ -71,5 +136,5 @@ export function useProjectSteps(project: any, deliverables: any[]) {
     }
   }, [project?.id, deliverables, toast]);
 
-  return projectSteps;
+  return { projectSteps, addProjectStep };
 } 

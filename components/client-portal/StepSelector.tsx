@@ -25,6 +25,7 @@ interface StepSelectorProps {
   project: any
   isOpen: boolean
   onAddStep?: () => void
+  isDesigner?: boolean // Ajout du prop isDesigner
 }
 
 // Renommer le composant pour refléter son nouveau rôle
@@ -35,7 +36,8 @@ export function StepSelector({
   closeSelector,
   project,
   isOpen,
-  onAddStep
+  onAddStep,
+  isDesigner = false // Valeur par défaut à false
 }: StepSelectorProps) {
   const { toast } = useToast()
   
@@ -44,8 +46,19 @@ export function StepSelector({
     // Prevent default behavior
     event.preventDefault();
     
-    // Ne pas traiter les étapes avec statut "Pending" ou équivalent
-    if (status === "Pending" || status === "upcoming") return
+    // Vérifier si l'utilisateur peut accéder à cette étape
+    const statusLower = status?.toLowerCase() || '';
+    const isUpcoming = statusLower === "upcoming" || statusLower === "pending";
+    
+    // Designer peut cliquer sur les étapes à venir, les autres utilisateurs non
+    if (isUpcoming && !isDesigner) {
+      toast({
+        title: "Accès restreint",
+        description: "Seuls les designers peuvent accéder aux étapes à venir.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Appeler la fonction de sélection avec l'ID et indiquer qu'on veut la dernière version
     onStepSelect(id, true)
@@ -101,6 +114,9 @@ export function StepSelector({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-1 px-3">
         {projectSteps.map((step) => {
           const status = getStatusStyle(step.status || 'Pending');
+          const statusLower = (step.status || '').toLowerCase();
+          const isUpcoming = statusLower === "upcoming" || statusLower === "pending";
+          
           return (
             <div 
               key={step.id}
@@ -108,7 +124,7 @@ export function StepSelector({
               className={`
                 group flex flex-col transition-all duration-150
                 ${step.id === activeStepId ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50 border-gray-100'}
-                ${status.label === "À venir" ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}
+                ${isUpcoming && !isDesigner ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}
                 rounded-md border overflow-hidden shadow-sm
               `}
             >

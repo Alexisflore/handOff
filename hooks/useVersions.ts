@@ -8,18 +8,17 @@ export function useVersions() {
   const [addingVersionForStepId, setAddingVersionForStepId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleAddNewVersion = (stepId: string | undefined, currentMilestone: string, deliverables: any[]) => {
+  const handleAddNewVersion = (stepId: string | undefined, currentMilestone?: string, deliverables?: any[]) => {
     // Debug logs
     console.log("=== Données critiques pour l'ajout de version ===");
     console.log("stepId passé en paramètre:", stepId);
     console.log("currentMilestone:", currentMilestone);
-    console.log("Toutes les étapes:", deliverables.map(d => ({ id: d.id, title: d.title })));
-    console.log("Vérification de l'étape sélectionnée:", deliverables.find(d => d.id === currentMilestone));
-    console.log("isAddVersionModalOpen avant:", isAddVersionModalOpen);
-    console.log("============================================");
+    console.log("deliverables:", deliverables ? `${deliverables.length} éléments` : 'non fourni');
     
-    // Utiliser le stepId passé en paramètre s'il existe, sinon utiliser currentMilestone
+    // CORRECTION CRITIQUE: Utiliser directement le stepId passé en paramètre s'il existe
+    // Ne pas tenter de vérifier son existence dans deliverables pour cette étape 
     const targetStepId = stepId || currentMilestone;
+    console.log("⚠️ ID UTILISE POUR L'AJOUT DE VERSION:", targetStepId);
     
     // Vérifier que targetStepId est défini
     if (!targetStepId) {
@@ -31,46 +30,50 @@ export function useVersions() {
       return;
     }
 
-    // Vérifier que cette étape existe bien dans la liste des étapes du projet
-    const stepExists = deliverables.some(d => d.id === targetStepId);
-    
-    if (!stepExists) {
-      toast({
-        title: "Erreur",
-        description: "L'étape sélectionnée n'existe pas ou n'est plus disponible.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    // Nous faisons confiance au stepId qui a été passé, même s'il n'est pas encore dans les deliverables
+    // car cela peut être une nouvelle étape sans livrables
     console.log("Ajout d'une nouvelle version pour l'étape:", targetStepId);
     
     // Sauvegarder le stepId dans une variable d'état pour l'utiliser plus tard
     setAddingVersionForStepId(targetStepId);
     
-    // Forcer un re-rendu complet du DOM avant d'afficher le modal
-    document.body.style.overflow = 'hidden';
-    
-    // Force l'ouverture du modal sans aucun délai et sans conditions préalables
-    setIsAddVersionModalOpen(true);
-    
-    // Double-vérification: manipuler directement le DOM si besoin
+    // Sauvegarder aussi dans localStorage et sessionStorage pour garantir la persistance
     try {
-      // Forcer l'affichage du modal via le DOM
-      setTimeout(() => {
+      localStorage.setItem('addingVersionForStepId', targetStepId);
+      sessionStorage.setItem('lastSelectedStepId', targetStepId);
+      console.log("Step ID sauvegardé dans localStorage et sessionStorage:", targetStepId);
+    } catch (e) {
+      console.error("Erreur lors de la sauvegarde dans localStorage:", e);
+    }
+    
+    // CORRECTION CRITIQUE: Ouvrir le modal avec un petit délai pour garantir que tout est prêt
+    setTimeout(() => {
+      // Forcer un re-rendu complet du DOM avant d'afficher le modal
+      document.body.style.overflow = 'hidden';
+      
+      // Force l'ouverture du modal
+      setIsAddVersionModalOpen(true);
+      console.log("isAddVersionModalOpen mis à:", true);
+      
+      // Manipuler directement le DOM en plus de l'état React
+      try {
         const modalElement = document.getElementById('version-modal-container');
         if (modalElement) {
           modalElement.style.display = 'flex';
-          console.log("Modal forcé via DOM");
+          console.log("🔴 Modal forcé via DOM");
         } else {
-          console.log("Élément modal non trouvé dans le DOM");
+          const backupModal = document.getElementById('backup-version-modal');
+          if (backupModal) {
+            backupModal.style.display = 'flex';
+            console.log("🔴 Modal de secours forcé via DOM");
+          } else {
+            console.log("⚠️ Aucun élément modal trouvé dans le DOM");
+          }
         }
-      }, 50);
-    } catch (err) {
-      console.error("Erreur lors de la manipulation du DOM:", err);
-    }
-    
-    console.log("isAddVersionModalOpen mis à:", true);
+      } catch (err) {
+        console.error("Erreur lors de la manipulation du DOM:", err);
+      }
+    }, 50); // Un court délai pour s'assurer que tout est prêt
   };
 
   const submitNewVersion = async (
@@ -142,84 +145,67 @@ export function useVersions() {
       
       const userId = await getUserId();
       
-      // Récupérer le stepId sauvegardé lors de l'ouverture du modal
+      // CORRECTION CRITIQUE: Récupérer le stepId de plusieurs sources
+      // 1. D'abord essayer la variable d'état React
       let stepId = addingVersionForStepId;
-      console.log("⭐ Utilisation directe du stepId sauvegardé:", stepId);
+      console.log("Tentative 1 - Step ID depuis React state:", stepId);
       
-      // Si addingVersionForStepId n'est pas défini, faire les vérifications habituelles
+      // 2. Si null, essayer de récupérer depuis localStorage
       if (!stepId) {
-        // Récupérer l'étape actuelle pour des logs détaillés
-        const stepForUpload = deliverables.find(d => d.id === currentMilestone);
-        console.log("Étape actuelle pour upload:", {
-          id: currentMilestone,
-          title: stepForUpload?.title,
-          status: stepForUpload?.status
-        });
-        
-        // Déterminons d'abord l'étape du projet à laquelle associer le nouveau livrable
-        if (stepForUpload) {
-          // Récupérer l'ID de l'étape associée au livrable actuel, ou l'ID du livrable lui-même si step_id n'existe pas
-          stepId = stepForUpload.step_id || stepForUpload.id;
-          console.log("Étape associée au livrable:", {
-            current_deliverable_id: stepForUpload.id,
-            step_id: stepId,
-            title: stepForUpload.title
-          });
-        } else {
-          // Rechercher une étape valide (d'abord 'current', puis 'completed', puis la première)
-          const currentSteps = deliverables.filter(d => d.status === 'current');
-          const completedSteps = deliverables.filter(d => d.status === 'completed');
-          
-          if (currentSteps.length > 0) {
-            stepId = currentSteps[0].step_id || currentSteps[0].id;
-            console.log("Utilisation de l'étape 'current':", {
-              deliverable_id: currentSteps[0].id,
-              step_id: stepId
-            });
-          } else if (completedSteps.length > 0) {
-            stepId = completedSteps[0].step_id || completedSteps[0].id;
-            console.log("Utilisation de l'étape 'completed':", {
-              deliverable_id: completedSteps[0].id,
-              step_id: stepId
-            });
-          } else if (deliverables.length > 0) {
-            stepId = deliverables[0].step_id || deliverables[0].id;
-            console.log("Utilisation de la première étape disponible:", {
-              deliverable_id: deliverables[0].id,
-              step_id: stepId
-            });
-          }
-        }
-        
-        // Si aucune étape (step) n'est trouvée, essayer de récupérer une étape de la base de données
-        if (!stepId) {
-          console.log("⚠️ Aucun step_id trouvé, tentative de récupération depuis la base de données...");
-          
-          try {
-            // Initialiser Supabase
-            const supabase = createBrowserClient(
-              process.env.NEXT_PUBLIC_SUPABASE_URL!,
-              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            );
-            
-            // Rechercher une étape valide pour ce projet
-            const { data: stepData, error: stepError } = await supabase
-              .from('project_steps')
-              .select('id')
-              .eq('project_id', project.id)
-              .limit(1);
-              
-            if (stepError) {
-              console.error("Erreur lors de la recherche d'une étape:", stepError);
-            } else if (stepData && stepData.length > 0) {
-              stepId = stepData[0].id;
-              console.log("✅ Étape trouvée dans la base de données:", stepId);
-            }
-          } catch (dbError) {
-            console.error("Erreur lors de la connexion à la base de données:", dbError);
-          }
+        try {
+          stepId = localStorage.getItem('addingVersionForStepId');
+          console.log("Tentative 2 - Step ID depuis localStorage:", stepId);
+        } catch (e) {
+          console.error("Erreur lors de la récupération depuis localStorage:", e);
         }
       }
+      
+      // 2b. Si toujours null, essayer sessionStorage
+      if (!stepId) {
+        try {
+          stepId = sessionStorage.getItem('lastSelectedStepId');
+          console.log("Tentative 2b - Step ID depuis sessionStorage:", stepId);
+        } catch (e) {
+          console.error("Erreur lors de la récupération depuis sessionStorage:", e);
+        }
+      }
+      
+      // 3. Si toujours null, utiliser currentMilestone comme dernier recours
+      if (!stepId) {
+        stepId = currentMilestone;
+        console.log("Tentative 3 - Utilisation de currentMilestone comme fallback:", stepId);
+      }
+      
+      // Afficher le contenu complet des arrays pour débogage
+      console.log("🔍 DIAGNOSTIC - Liste des project_steps disponibles:", 
+        projectSteps.map(step => ({ id: step.id, title: step.title || "Sans titre" }))
+      );
+      console.log("🔍 DIAGNOSTIC - Liste des deliverables disponibles:", 
+        deliverables.map(d => ({ id: d.id, title: d.title || "Sans titre" }))
+      );
+      
+      // CORRECTION CRITIQUE: Vérifier si le stepId existe dans projectSteps et non dans deliverables
+      const stepExistsInProjectSteps = projectSteps.some(step => step.id === stepId);
+      console.log(`Step ID ${stepId} existe dans project_steps: ${stepExistsInProjectSteps ? 'OUI ✅' : 'NON ❌'}`);
+      
+      // Si le stepId n'existe pas dans projectSteps, essayer de trouver un stepId valide
+      if (!stepExistsInProjectSteps && projectSteps.length > 0) {
+        console.log("⚠️ Le step ID n'existe pas dans project_steps, utilisation du premier step disponible");
+        stepId = projectSteps[0].id;
+        console.log("Nouveau step ID (depuis project_steps):", stepId);
+      }
+      // Fallback si aucun projectStep n'est disponible mais des deliverables existent
+      else if (!stepExistsInProjectSteps && projectSteps.length === 0 && deliverables.length > 0) {
+        console.log("⚠️ Aucun project_step trouvé, vérification dans deliverables");
+        const stepExistsInDeliverables = deliverables.some(d => d.id === stepId);
+        
+        if (!stepExistsInDeliverables) {
+          stepId = deliverables[0].id;
+          console.log("Nouveau step ID (depuis deliverables):", stepId);
+        }
+      }
+      
+      console.log("✅ Étape identifiée pour le nouveau livrable:", stepId);
       
       // Si toujours pas d'étape, bloquer le processus
       if (!stepId) {
@@ -227,8 +213,6 @@ export function useVersions() {
         console.error("Étapes disponibles:", deliverables.length);
         throw new Error("Aucune étape trouvée. Impossible d'ajouter un livrable.");
       }
-      
-      console.log("✅ Étape identifiée pour le nouveau livrable:", stepId);
       
       // Enregistrer la nouvelle version dans la base de données
       console.log('Étape associée au nouveau livrable:', stepId);
@@ -274,6 +258,14 @@ export function useVersions() {
       
       const saveResult = await saveResponse.json();
       console.log('Version sauvegardée avec succès:', saveResult);
+      
+      // NOUVEAU: Nettoyer après utilisation réussie
+      setAddingVersionForStepId(null);
+      try {
+        localStorage.removeItem('addingVersionForStepId');
+      } catch (e) {
+        console.error("Erreur lors de la suppression depuis localStorage:", e);
+      }
       
       // Notification de succès
       toast({
