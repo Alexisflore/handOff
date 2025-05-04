@@ -4,7 +4,6 @@ import { NextResponse } from "next/server"
 export async function GET() {
   try {
     const supabase = createServerSupabaseClient()
-    const projectId = "550e8400-e29b-41d4-a716-446655440020"
     
     // Vérifier les étapes du projet
     const { data: steps, error: stepsError } = await supabase

@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from "uuid"
 export async function GET() {
   try {
     const supabase = createServerSupabaseClient()
-    const projectId = "550e8400-e29b-41d4-a716-446655440020"
     
     // ID d'un utilisateur existant (récupérons d'abord un utilisateur valide)
     const { data: users } = await supabase

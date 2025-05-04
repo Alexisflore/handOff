@@ -19,7 +19,8 @@ export default async function Page({ params, searchParams }: {
   const id = resolvedParams.id;
   
   // Récupérer l'onglet actif depuis les paramètres d'URL ou utiliser "dashboard" par défaut
-  const activeTab = searchParams.tab || "dashboard";
+  const resolvedSearchParams = await searchParams;
+  const activeTab = resolvedSearchParams.tab || "dashboard";
   
   // Vérifier si l'ID est valide
   if (!id || id === "undefined" || id === "[id]") {

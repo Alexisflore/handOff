@@ -21,6 +21,7 @@ export interface Version {
   status?: string
   step_id: string
   description?: string
+  deliverable_title?: string  // Nom du livrable associé à cette version
 }
 
 export interface Comment {
@@ -44,6 +45,8 @@ export interface Deliverable {
   status: "upcoming" | "current" | "completed"
   icon?: string
   versions?: Version[]
+  step_id?: string  // ID de l'étape associée au livrable
+  project_id?: string
 }
 
 export interface CurrentUser {

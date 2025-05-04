@@ -76,7 +76,7 @@ export default function LoginDesignerPage() {
       
       // Rediriger vers le projet après 2 secondes
       setTimeout(() => {
-        router.push("/projects/550e8400-e29b-41d4-a716-446655440020");
+        router.push("/projects");
       }, 2000);
     } catch (err) {
       console.error("Erreur:", err)

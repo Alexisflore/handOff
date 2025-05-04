@@ -11,6 +11,7 @@ interface ClientHeaderProps {
   sidebarCollapsed: boolean
   client: any
   activeDeliverable: Deliverable
+  activeStep?: any
   refreshProjectData: () => Promise<void>
   isRefreshing: boolean
   currentUser?: any
@@ -22,12 +23,17 @@ export function ClientHeader({
   sidebarCollapsed,
   client,
   activeDeliverable,
+  activeStep,
   refreshProjectData,
   isRefreshing,
   currentUser,
   toggleDeliverableSelector,
   project
 }: ClientHeaderProps) {
+  const displayItem = activeStep || activeDeliverable;
+  const displayTitle = displayItem?.title || "Étape non sélectionnée";
+  const displayStatus = displayItem?.status || "pending";
+
   return (
     <header className="flex w-full border-b border-slate-200 h-[56px] shrink-0 sticky top-0 z-30 bg-white">
       {/* Client logo section */}
@@ -60,22 +66,22 @@ export function ClientHeader({
           <ChevronRight className="h-4 w-4 mx-1.5 text-slate-400 flex-shrink-0" />
           
           <div className="flex items-center">
-            <span className="text-base font-medium text-slate-800 max-w-[200px] truncate">{activeDeliverable.title}</span>
+            <span className="text-base font-medium text-slate-800 max-w-[200px] truncate">{displayTitle}</span>
             <Badge
               variant="outline"
               className={`ml-2 text-xs border-opacity-50 ${
-                activeDeliverable.status === "completed"
+                displayStatus === "completed"
                   ? "bg-green-50/50 text-green-700 border-green-100"
-                  : activeDeliverable.status === "current"
+                  : displayStatus === "current"
                     ? "bg-amber-50/50 text-amber-700 border-amber-100" 
                     : "bg-slate-50/50 text-slate-500 border-slate-100"
               }`}
             >
-              {activeDeliverable.status === "completed" 
-                ? "Approved" 
-                : activeDeliverable.status === "current" 
-                  ? "In Progress" 
-                  : "Upcoming"}
+              {displayStatus === "completed" 
+                ? "Terminée" 
+                : displayStatus === "current" 
+                  ? "En cours" 
+                  : "À venir"}
             </Badge>
           </div>
           
@@ -94,7 +100,7 @@ export function ClientHeader({
               }, 50);
             }}
           >
-            <span className="text-xs">Tous les livrables</span>
+            <span className="text-xs">Toutes les étapes</span>
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
         </div>

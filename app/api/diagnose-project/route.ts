@@ -9,7 +9,7 @@ export async function GET() {
     const { data: project, error: projectError } = await supabase
       .from("projects")
       .select("*")
-      .eq("id", "550e8400-e29b-41d4-a716-446655440020")
+      .eq("id", projectId)
       .maybeSingle()
     
     if (projectError) {
@@ -30,7 +30,7 @@ export async function GET() {
     const { data: projectSteps, error: projectStepsError } = await supabase
       .from("project_steps")
       .select("*")
-      .eq("project_id", "550e8400-e29b-41d4-a716-446655440020")
+      .eq("project_id", projectId)
     
     if (projectStepsError) {
       return NextResponse.json({ error: "Erreur lors de la récupération des étapes du projet", details: projectStepsError }, { status: 500 })
@@ -43,7 +43,7 @@ export async function GET() {
       .upsert([
         {
           id: testStepId,
-          project_id: "550e8400-e29b-41d4-a716-446655440020",
+          project_id: projectId,
           title: "Étape de test",
           description: "Étape créée pour diagnostiquer le problème",
           status: "pending",
